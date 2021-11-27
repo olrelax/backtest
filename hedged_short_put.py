@@ -1,14 +1,12 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-src_df = pd.read_csv('data/SPY-chains.csv').drop('Unnamed: 0', axis=1)
-result_df = pd.DataFrame(columns=('trade_date', 'underlying_price', 'expiry_price', 'strike_short', 'premium_short',
-                                  'strike_long', 'premium_long', 'spread_result', 'summary', 'case','short_depth',
-                                  'long_depth','margin','net_premium','commission'))
-def do_hedged_short_put(trade_date):
-    global result_df, summary, trade_num, h, m, low, skp
+from au import get_closest
+
+commission = 2.1
+
+
+def do_hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
     df_pc = src_df.loc[src_df['data_date'] == trade_date]
     df = df_pc.loc[src_df['type'] == 'put']
-    df.to_csv('tmp/%s.csv' % trade_date)
+    df.to_csv('../tmp/%s.csv' % trade_date)
     df0 = df.iloc[0]
     underlying_price = df0['underlying_price']
     expiry_price = df0['expiry_price']
@@ -38,22 +36,18 @@ def do_hedged_short_put(trade_date):
     margin = 0.
     if expiry_price >= strike_short:
         case = 'h'
-        h += 1
     elif strike_long < expiry_price < strike_short:
         margin = expiry_price - strike_short
         if short_only_trade or long_shift == 0:
             case = 'l'
-            low += 1
         else:
             case = 'm'
-            m += 1
     elif expiry_price <= strike_long:
         if short_only_trade:
             margin = strike_short - expiry_price
         else:
             margin = strike_long - strike_short
         case = 'l'
-        low += 1
     else:
         case = 'unknown case'
         exit(case)
@@ -64,16 +58,16 @@ def do_hedged_short_put(trade_date):
     else:
         net_premium = (100.0 * (premium_short - premium_long))
         trade_commission = 2.0 * commission
-    spread_result = (100.0 * margin) + net_premium - trade_commission
     long_depth = underlying_price - strike_long if strike_long > 0 else 0
     if net_premium - trade_commission > 0:
-        summary += spread_result
+        spread_result = (100.0 * margin) + net_premium - trade_commission
+        total += spread_result
         #  'short_depth', 'long_depth', 'margin', 'net_premium', 'commission'
         rw = [trade_date, underlying_price, expiry_price, strike_short, premium_short, strike_long, premium_long,
-              spread_result, summary, case, underlying_price - strike_short, long_depth, margin * 100.0, net_premium, trade_commission]
+              spread_result, total, case, underlying_price - strike_short, long_depth, margin * 100.0, net_premium,
+              trade_commission]
     else:
         rw = [trade_date, underlying_price, expiry_price, strike_short, premium_short, strike_long, premium_long, 0,
-              summary, 'skip',underlying_price - strike_short, long_depth,0,net_premium,trade_commission]
+              total, 'skip', underlying_price - strike_short, long_depth, 0, net_premium, trade_commission]
         print('%s premium = %.2f' % (trade_date, net_premium - trade_commission))
-    result_df.loc[trade_num] = rw
-    trade_num += 1
+    return rw,total
