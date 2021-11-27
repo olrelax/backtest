@@ -2,6 +2,49 @@ from au import get_closest
 
 commission = 2.1
 allow_short_only = True  # can tune
+def long_put_short_call(src_df, trade_date, put_shift,call_shift, total,premium_limit):
+    df_pc = src_df.loc[src_df['data_date'] == trade_date]
+    df_put = df_pc.loc[src_df['type'] == 'put']
+    # df_put.to_csv('../tmp/put_%s.csv' % trade_date)
+    df_call = df_pc.loc[src_df['type'] == 'call']
+    # df_call.to_csv('../tmp/call_%s.csv' % trade_date)
+    underlying_price = df_put.iloc[0]['underlying_price']
+    expiry_price = df_put.iloc[0]['expiry_price']
+    put_strike, put_premium = get_closest(df_put, underlying_price - put_shift,'put')
+    call_strike, call_premium = get_closest(df_call, underlying_price + call_shift,'call')
+    # put:
+    if put_premium < premium_limit:
+        put_premium_result = -put_premium * 100.0 - commission
+        if expiry_price >= put_strike:   # expire OTM
+            put_margin = 0
+            case = 'pOTM'
+        else:   # expire ITM
+            put_margin = 100.0*(put_strike - expiry_price)
+            case = 'pITM '
+        put_result = put_premium_result + put_margin
+    else:
+        put_result = 0
+        case = 'ps '
+    # call:
+    call_premium_result = 100.0 * call_premium - commission
+    if expiry_price <= call_strike:    # expire OTM
+        call_margin = 0
+        call_case = case + 'cOTM'
+    else:
+        call_margin = 100.0*(call_strike - expiry_price)    # expire ITM, negative value
+        call_case = case + 'cITM'
+    if call_premium_result > 0:
+        call_result = call_margin + call_premium_result
+        case = case + call_case
+    else:
+        call_result = 0
+    trade_result = put_result + call_result
+
+
+    total += trade_result
+    rw = [trade_date, underlying_price, expiry_price, call_strike, call_premium, put_strike, put_premium,
+          trade_result, total, case, 0, 0, 0, 0, commission]
+    return rw,total,case
 
 
 def long_put(src_df, trade_date, long_shift,total,premium_limit):

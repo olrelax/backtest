@@ -1,5 +1,5 @@
 
-def get_closest(df, val, put_or_call='put'):
+def get_closest(df, val, put_or_call):
     min_delta, premium, strike = 1000000., 0., 0
     for index, row in df.iterrows():
         opt_type = row['type']
