@@ -2,6 +2,8 @@ from au import get_closest
 
 commission = 2.1
 
+allow_short_only = True  # can tune
+
 
 def do_hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
     df_pc = src_df.loc[src_df['data_date'] == trade_date]
@@ -10,8 +12,7 @@ def do_hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
     df0 = df.iloc[0]
     underlying_price = df0['underlying_price']
     expiry_price = df0['expiry_price']
-    allow_short_only = False
-    short_only_trade = False
+    short_only_trade = False    # do not touch it
     # get strike values
     if short_shift < long_shift < 0:
         strike_long, premium_long = get_closest(df, 0)

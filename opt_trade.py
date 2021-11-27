@@ -9,8 +9,8 @@ result_df = pd.DataFrame(columns=('trade_date', 'underlying_price', 'expiry_pric
                                   'long_depth','margin','net_premium','commission'))
 
 
-short_shift = -8
-long_shift = -1
+short_shift = 12
+long_shift = 15
 if short_shift >= long_shift:
     if long_shift > 0:
         exit('wrong shift values')
@@ -43,4 +43,4 @@ ax = dfr.plot(figsize=(10, 8), subplots=True)
 y_min, y_max = ax[1].get_ylim()
 # ax[1].text(0, y_max * 0.5,)
 plt.show()
-result_df.to_csv('out/trade(short%d_long%d).csv' % (short_shift, long_shift))
+result_df.to_csv('../out/trade(short%d_long%d).csv' % (short_shift, long_shift))
