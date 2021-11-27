@@ -1,17 +1,40 @@
 from au import get_closest
 
 commission = 2.1
-
 allow_short_only = True  # can tune
 
 
-def do_hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
+def long_put(src_df, trade_date, long_shift,total,premium_limit):
     df_pc = src_df.loc[src_df['data_date'] == trade_date]
     df = df_pc.loc[src_df['type'] == 'put']
     df.to_csv('../tmp/%s.csv' % trade_date)
-    df0 = df.iloc[0]
-    underlying_price = df0['underlying_price']
-    expiry_price = df0['expiry_price']
+    underlying_price = df.iloc[0]['underlying_price']
+    expiry_price = df.iloc[0]['expiry_price']
+    strike, premium = get_closest(df, underlying_price - long_shift)
+    if premium < premium_limit:
+        result = -premium * 100.0 - commission
+        case = 'h'
+        margin = 0
+        if expiry_price < strike:
+            margin = 100.0*(strike - expiry_price)
+            case = 'l'
+        result = result + margin
+        total += result
+    else:
+        result = 0
+        case = 'skip'
+        margin = 0
+    rw = [trade_date, underlying_price, expiry_price, 0, 0, strike, premium,
+          result, total, case, 0, 0, margin * 100.0, premium, commission]
+    return rw,total,case
+
+
+def hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
+    df_pc = src_df.loc[src_df['data_date'] == trade_date]
+    df = df_pc.loc[src_df['type'] == 'put']
+    df.to_csv('../tmp/%s.csv' % trade_date)
+    underlying_price = df.iloc[0]['underlying_price']
+    expiry_price = df.iloc[0]['expiry_price']
     short_only_trade = False    # do not touch it
     # get strike values
     if short_shift < long_shift < 0:
@@ -21,11 +44,13 @@ def do_hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
         strike_long, premium_long = get_closest(df, underlying_price - long_shift)
         strike_short, premium_short = get_closest(df, underlying_price - short_shift)
         if strike_short == strike_long:
-            print('Warning, strikes are equal for trade_date %s ' % df0['data_date'])
+            e_date = df.iloc[0]['data_date']
             if allow_short_only:
                 strike_long, premium_long = 0, 0
                 short_only_trade = True
-                print('go single short')
+                print('go single short at %s' % e_date)
+            else:
+                print('Warning, strikes are equal for trade_date %s ' % e_date)
     elif long_shift == 0:
         strike_short, premium_short = get_closest(df, underlying_price - short_shift)
         strike_long, premium_long = 0, 0
@@ -71,4 +96,4 @@ def do_hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
         rw = [trade_date, underlying_price, expiry_price, strike_short, premium_short, strike_long, premium_long, 0,
               total, 'skip', underlying_price - strike_short, long_depth, 0, net_premium, trade_commission]
         print('%s premium = %.2f' % (trade_date, net_premium - trade_commission))
-    return rw,total
+    return rw,total,case
