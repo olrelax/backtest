@@ -10,17 +10,17 @@ def short_call(src_df, trade_date, shift,premium_limit):
     strike, premium = get_closest(df, underlying_price + shift,'call')
     if premium > premium_limit:
         case = 'sc_OOL'
-        return [trade_date, underlying_price, expiry_price, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        return [trade_date, underlying_price, expiry_price, 0, 0, 0, 0, 0, 0, 0, 0, 0,0]
     result = premium * 100.0 - commission
     margin = 0
     case = 'sc_OTM'
-    if expiry_price > strike:
-        margin = 100.0*(expiry_price - strike)
+    if strike < expiry_price:
+        margin = 100.0*(strike - expiry_price)    # negative
         case = 'sc_ITM'
     result = result + margin
-    return [trade_date, underlying_price, expiry_price, strike, premium, 0, 0, commission, result, 0,0,0], result
+    return [trade_date, underlying_price, expiry_price, strike, premium, 0, 0, commission, result, 0,0,0,0], result
     # 'trade_date', 'underlying_price', 'expiry_price', 'call_strike', 'call_premium',
-    # 'put_strike', 'put_premium', 'commission', 'call p/l', 'put p/l', 'stock p/l', 'total'
+    # 'put_strike', 'put_premium', 'commission', 'call p/l', 'put p/l', 'stock p/l', 'total','aux'
 
 def long_put(src_df, trade_date, shift,premium_limit):
     df_pc = src_df.loc[src_df['data_date'] == trade_date]
@@ -30,7 +30,7 @@ def long_put(src_df, trade_date, shift,premium_limit):
     strike, premium = get_closest(df, underlying_price - shift,'put')
     if premium > premium_limit:
         case = 'lp_OOL'
-        return [trade_date, underlying_price, expiry_price, 0, 0, 0, 0, 0, 0, 0, case]
+        return [trade_date, underlying_price, expiry_price, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     result = -premium * 100.0 - commission
     margin = 0
     case = 'lp_OTM'
@@ -38,9 +38,9 @@ def long_put(src_df, trade_date, shift,premium_limit):
         margin = 100.0*(strike - expiry_price)
         case = 'lp_ITM'
     result = result + margin
-    return [trade_date, underlying_price, expiry_price, 0,0,strike, premium, commission, 0, result, 0, 0], result
+    return [trade_date, underlying_price, expiry_price, 0,0,strike, premium, commission, 0, result, 0, 0, 0], result
     # 'trade_date', 'underlying_price', 'expiry_price', 'call_strike', 'call_premium',
-    # 'put_strike', 'put_premium', 'commission', 'call p/l', 'put p/l', 'stock p/l', 'total'
+    # 'put_strike', 'put_premium', 'commission', 'call p/l', 'put p/l', 'stock p/l', 'total','aux'
 
 
 
