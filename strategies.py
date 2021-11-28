@@ -2,74 +2,47 @@ from au import get_closest
 
 commission = 2.1
 allow_short_only = True  # can tune
-def long_put_short_call(src_df, trade_date, put_shift,call_shift, total,premium_limit):
+def short_call(src_df, trade_date, shift,premium_limit):
     df_pc = src_df.loc[src_df['data_date'] == trade_date]
-    df_put = df_pc.loc[src_df['type'] == 'put']
-    # df_put.to_csv('../tmp/put_%s.csv' % trade_date)
-    df_call = df_pc.loc[src_df['type'] == 'call']
-    # df_call.to_csv('../tmp/call_%s.csv' % trade_date)
-    underlying_price = df_put.iloc[0]['underlying_price']
-    expiry_price = df_put.iloc[0]['expiry_price']
-    put_strike, put_premium = get_closest(df_put, underlying_price - put_shift,'put')
-    call_strike, call_premium = get_closest(df_call, underlying_price + call_shift,'call')
-    # put:
-    if put_premium < premium_limit:
-        put_premium_result = -put_premium * 100.0 - commission
-        if expiry_price >= put_strike:   # expire OTM
-            put_margin = 0
-            case = 'pOTM'
-        else:   # expire ITM
-            put_margin = 100.0*(put_strike - expiry_price)
-            case = 'pITM '
-        put_result = put_premium_result + put_margin
-    else:
-        put_result = 0
-        case = 'ps '
-    # call:
-    call_premium_result = 100.0 * call_premium - commission
-    if expiry_price <= call_strike:    # expire OTM
-        call_margin = 0
-        call_case = case + 'cOTM'
-    else:
-        call_margin = 100.0*(call_strike - expiry_price)    # expire ITM, negative value
-        call_case = case + 'cITM'
-    if call_premium_result > 0:
-        call_result = call_margin + call_premium_result
-        case = case + call_case
-    else:
-        call_result = 0
-    trade_result = put_result + call_result
-
-
-    total += trade_result
-    rw = [trade_date, underlying_price, expiry_price, call_strike, call_premium, put_strike, put_premium,
-          trade_result, total, case, 0, 0, 0, 0, commission]
-    return rw,total,case
-
-
-def long_put(src_df, trade_date, long_shift,total,premium_limit):
-    df_pc = src_df.loc[src_df['data_date'] == trade_date]
-    df = df_pc.loc[src_df['type'] == 'put']
-    df.to_csv('../tmp/%s.csv' % trade_date)
+    df = df_pc.loc[src_df['type'] == 'call']
     underlying_price = df.iloc[0]['underlying_price']
     expiry_price = df.iloc[0]['expiry_price']
-    strike, premium = get_closest(df, underlying_price - long_shift)
-    if premium < premium_limit:
-        result = -premium * 100.0 - commission
-        case = 'h'
-        margin = 0
-        if expiry_price < strike:
-            margin = 100.0*(strike - expiry_price)
-            case = 'l'
-        result = result + margin
-        total += result
-    else:
-        result = 0
-        case = 'skip'
-        margin = 0
-    rw = [trade_date, underlying_price, expiry_price, 0, 0, strike, premium,
-          result, total, case, 0, 0, margin * 100.0, premium, commission]
-    return rw,total,case
+    strike, premium = get_closest(df, underlying_price + shift,'call')
+    if premium > premium_limit:
+        case = 'sc_OOL'
+        return [trade_date, underlying_price, expiry_price, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    result = premium * 100.0 - commission
+    margin = 0
+    case = 'sc_OTM'
+    if expiry_price > strike:
+        margin = 100.0*(expiry_price - strike)
+        case = 'sc_ITM'
+    result = result + margin
+    return [trade_date, underlying_price, expiry_price, strike, premium, 0, 0, commission, result, 0,0,0], result
+    # 'trade_date', 'underlying_price', 'expiry_price', 'call_strike', 'call_premium',
+    # 'put_strike', 'put_premium', 'commission', 'call p/l', 'put p/l', 'stock p/l', 'total'
+
+def long_put(src_df, trade_date, shift,premium_limit):
+    df_pc = src_df.loc[src_df['data_date'] == trade_date]
+    df = df_pc.loc[src_df['type'] == 'put']
+    underlying_price = df.iloc[0]['underlying_price']
+    expiry_price = df.iloc[0]['expiry_price']
+    strike, premium = get_closest(df, underlying_price - shift,'put')
+    if premium > premium_limit:
+        case = 'lp_OOL'
+        return [trade_date, underlying_price, expiry_price, 0, 0, 0, 0, 0, 0, 0, case]
+    result = -premium * 100.0 - commission
+    margin = 0
+    case = 'lp_OTM'
+    if expiry_price < strike:
+        margin = 100.0*(strike - expiry_price)
+        case = 'lp_ITM'
+    result = result + margin
+    return [trade_date, underlying_price, expiry_price, 0,0,strike, premium, commission, 0, result, 0, 0], result
+    # 'trade_date', 'underlying_price', 'expiry_price', 'call_strike', 'call_premium',
+    # 'put_strike', 'put_premium', 'commission', 'call p/l', 'put p/l', 'stock p/l', 'total'
+
+
 
 
 def hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
@@ -139,4 +112,59 @@ def hedged_short_put(src_df, trade_date, short_shift, long_shift, total):
         rw = [trade_date, underlying_price, expiry_price, strike_short, premium_short, strike_long, premium_long, 0,
               total, 'skip', underlying_price - strike_short, long_depth, 0, net_premium, trade_commission]
         print('%s premium = %.2f' % (trade_date, net_premium - trade_commission))
+    return rw,total,case
+
+
+
+
+def long_put_short_call(src_df, trade_date, put_shift,call_shift, total,premium_limit,what_trade):
+    df_pc = src_df.loc[src_df['data_date'] == trade_date]
+    df_put = df_pc.loc[src_df['type'] == 'put']
+    # df_put.to_csv('../tmp/put_%s.csv' % trade_date)
+    df_call = df_pc.loc[src_df['type'] == 'call']
+    # df_call.to_csv('../tmp/call_%s.csv' % trade_date)
+    underlying_price = df_put.iloc[0]['underlying_price']
+    expiry_price = df_put.iloc[0]['expiry_price']
+    put_strike, put_premium = get_closest(df_put, underlying_price - put_shift,'put')
+    call_strike, call_premium = get_closest(df_call, underlying_price + call_shift,'call')
+    case = ''
+    comm,put_result,call_result = 0,0,0
+    # put:
+    if what_trade == 'p' or what_trade == 'pc':
+        if put_premium < premium_limit:
+            put_premium_result = -put_premium * 100.0 - commission
+            if expiry_price >= put_strike:   # expire OTM
+                put_margin = 0
+                case = 'pOTM'
+            else:   # expire ITM
+                put_margin = 100.0*(put_strike - expiry_price)
+                case = 'pITM '
+            put_result = put_premium_result + put_margin
+            comm = commission
+        else:
+            comm, put_result = 0, 0
+            case = 'pOOL '
+    # call:
+    if what_trade == 'c' or what_trade =='pc':
+        call_premium_result = 100.0 * call_premium - commission
+        if expiry_price <= call_strike:    # expire OTM
+            call_margin = 0
+            call_case = 'cOTM'
+        else:
+            call_margin = 100.0*(call_strike - expiry_price)    # expire ITM, negative value
+            call_case = 'cITM'
+        if call_premium_result > 0:
+            call_result = call_margin + call_premium_result
+            case = case + call_case
+            comm += commission
+        else:
+            call_result = 0
+            case += case + 'sSKP'
+
+    trade_result = put_result + call_result
+
+
+    total += trade_result
+    rw = [trade_date, underlying_price, expiry_price, call_strike, call_premium, put_strike, put_premium,
+          trade_result, total, case, 0, 0, 0, 0, comm]
     return rw,total,case
