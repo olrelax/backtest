@@ -12,12 +12,15 @@ def short_call(src_df, trade_date, shift,premium_limit):
         case = 'sc_OOL'
         return [trade_date, underlying_price, expiry_price, 0, 0, 0, 0, 0, 0, 0, 0, 0,0]
     result = premium * 100.0 - commission
-    margin = 0
-    case = 'sc_OTM'
-    if strike < expiry_price:
-        margin = 100.0*(strike - expiry_price)    # negative
-        case = 'sc_ITM'
-    result = result + margin
+    if result > 0:
+        margin = 0
+        case = 'sc_OTM'
+        if strike < expiry_price:
+            margin = 100.0*(strike - expiry_price)    # negative
+            case = 'sc_ITM'
+        result = result + margin
+    else:
+        result = 0
     return [trade_date, underlying_price, expiry_price, strike, premium, 0, 0, commission, result, 0,0,0,0], result
     # 'trade_date', 'underlying_price', 'expiry_price', 'call_strike', 'call_premium',
     # 'put_strike', 'put_premium', 'commission', 'call p/l', 'put p/l', 'stock p/l', 'total','aux'
