@@ -4,6 +4,12 @@ import pandas as pd
 import globalvars as gv
 from os import path
 import time
+"""
+from inspect import currentframe, getframeinfo
+fl(getframeinfo(currentframe()))
+from au import fl
+"""
+
 def get_monthly_opts(date, opts,opt_type):
     possible_exp = add_days(last_month_day(date), gv.days2exp + 5)
     if opts is None:

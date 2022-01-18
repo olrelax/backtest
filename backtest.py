@@ -8,11 +8,6 @@ from position import Position,getz,delz,listz
 from transactions import close_positions, open_position
 from plot import plot
 from shutil import copyfile
-"""
-from inspect import currentframe, getframeinfo
-fl(getframeinfo(currentframe()))
-from au import fl
-"""
 def archive():
     arc_filename = 'options-' + datetime.now().strftime('%Y-%m-%d--%H-%M')
     cmd = 'tar cvf ../Archive/%s.tar *.py config.ini  2>/dev/null' % arc_filename
