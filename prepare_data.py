@@ -32,9 +32,13 @@ def append_cboe(new_data_fn, option_type='P'):
     print('saving csv...')
     df.to_csv(old_data_fn,index=False)
 
-def process_cboe_source(year='2022', option_type='P'):
+def process_cboe_source(year, option_type):
     i = 0
     f = []
+    if year is None:
+        year = '2022'
+    if option_type is None:
+        option_type = 'P'
     d = '../data/SPY_%s_CBOE_SRC/' % year
     for (path, names, filenames) in walk(d):
         f.extend(filenames)

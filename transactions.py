@@ -1,5 +1,4 @@
 from au import d2s, s2d, intraday_tested_dates
-# from opt_math import target_price_formula, target_dist_formula
 import globalvars as gv
 from datetime import datetime
 from select_option import select_opt
@@ -121,6 +120,14 @@ def close_positions(opts, date, z:Position, vlt, under_930, z_pair:Position=None
 SHORT = -1
 LONG = 1
 
+def check_trade_days(date):
+    if gv.trade_day_of_week is None:
+        return True
+    if isinstance(gv.trade_day_of_week,int):
+        return date.isoweekday() == gv.trade_day_of_week
+    elif isinstance(gv.trade_day_of_week,str):
+        days_list = list(map(int, gv.trade_day_of_week.split(',')))
+        return date.isoweekday() in days_list
 
 def open_position(opts, date: datetime, target_exp, za, z: Position, vlt, long_param=None):
     if not z.is_tradable():
@@ -130,7 +137,7 @@ def open_position(opts, date: datetime, target_exp, za, z: Position, vlt, long_p
     vlt_open_criteria = vlt < gv.vlt_open if ntn(gv.vlt_open) and z.option_type == 'P' else vlt > gv.vlt_open if ntn(
         gv.vlt_open) and z.option_type == 'C' else True
     exclude_date_criteria = s2d(gv.exclude_bound[0]) <= date < s2d(gv.exclude_bound[1]) if gv.exclude_bound is not None else False
-    weekday_criteria = date.isoweekday() == gv.trade_day_of_week if ntn(gv.trade_day_of_week) else True
+    weekday_criteria = check_trade_days(date)
     day_criteria = weekday_criteria
     forced = date == s2d(gv.forced_exit_date)
 

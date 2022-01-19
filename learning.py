@@ -10,11 +10,17 @@ from position import Position
 from datetime import datetime
 import time
 import sqlitetocsv as sql
-import globalvars
+import globalvars as gv
 
 from inspect import currentframe, getframeinfo
 from au import fl
-def run():
-    print('text line 1:{},2:{}'.format(datetime.now().strftime('%Y'),2))
+
+
+def learn():
+
+    w = gv.ini('trade_day_of_week')
+    print(type(w))
+
+
 if __name__ == '__main__':
-    run()
+    learn()

@@ -8,6 +8,7 @@ from position import Position,getz,delz,listz
 from transactions import close_positions, open_position
 from plot import plot
 from shutil import copyfile
+from learning import learn
 def archive():
     arc_filename = 'options-' + datetime.now().strftime('%Y-%m-%d--%H-%M')
     cmd = 'tar cvf ../Archive/%s.tar *.py config.ini  2>/dev/null' % arc_filename
@@ -206,13 +207,15 @@ def run(task=''):
     elif task == 'nn':
         train()
     elif task == 'p':
-        plot('xls')
+        plot('last')
     elif task == 'a':
         archive()
     elif task == 'i':
         iterate_bt(test=False)
     elif task == 'i_test':
         iterate_bt(test=True)
+    elif task == 'learn':
+        learn()
 
 
 if __name__ == '__main__':
