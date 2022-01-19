@@ -1,5 +1,6 @@
 from neural_net import get_nn
 import globalvars as gv
+# TEST COMMIT
 def target_price_formula(open_prc, vlt, is_short):
 
     diff = vlt[-1] - vlt[0]
