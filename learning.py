@@ -11,10 +11,10 @@ from datetime import datetime
 import time
 import sqlitetocsv as sql
 import globalvars
-qqq = 8
-def run():
-    eval('a=20')
-    print(a)
 
+from inspect import currentframe, getframeinfo
+from au import fl
+def run():
+    print('text line 1:{},2:{}'.format(datetime.now().strftime('%Y'),2))
 if __name__ == '__main__':
     run()

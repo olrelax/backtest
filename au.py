@@ -33,12 +33,6 @@ def get_monthly_opts(date, opts,opt_type):
     return opts
 
 
-
-
-
-
-
-
 def fl(arg):
     string = path.basename(arg.filename) + ':' + str(arg.lineno) + ' ' + datetime.now().strftime('%M:%S:%f')
     print(string)

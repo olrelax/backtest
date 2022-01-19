@@ -130,8 +130,8 @@ def open_position(opts, date: datetime, target_exp, za, z: Position, vlt, long_p
     vlt_open_criteria = vlt < gv.vlt_open if ntn(gv.vlt_open) and z.option_type == 'P' else vlt > gv.vlt_open if ntn(
         gv.vlt_open) and z.option_type == 'C' else True
     exclude_date_criteria = s2d(gv.exclude_bound[0]) <= date < s2d(gv.exclude_bound[1]) if gv.exclude_bound is not None else False
-    weekday_criteria = date.isoweekday() == gv.trade_day_of_week if gv.trade_day_of_week else False
-    day_criteria = gv.every_day_trade or weekday_criteria
+    weekday_criteria = date.isoweekday() == gv.trade_day_of_week if ntn(gv.trade_day_of_week) else True
+    day_criteria = weekday_criteria
     forced = date == s2d(gv.forced_exit_date)
 
     if algo in ('base_on_atm', 'nn', 'distance', 'hedge_distance', 'fixprice'):

@@ -19,7 +19,6 @@ ed = ''
 exclude_period = ''
 exclude_bound = ''
 suffix = ''
-every_day_trade = False
 trade_day_of_week = None
 opts_annual, opts_annual_next_year = None, None
 algo_short = ''
@@ -102,7 +101,7 @@ def ini(entry_name, default_value=None):
 def read_ini():
     global comm, show, vlt_close, vlt_open, do_not_open_the_same_day, days2exp, \
         short_param, long_param, vlt_sample_size, max_price_diff, bd,ed,exclude_period,trade_day_of_week, \
-        algo_short, algo_long,every_day_trade,stop_loss,forced_exit_date,intraday_tested,\
+        algo_short, algo_long,stop_loss,forced_exit_date,intraday_tested,\
         strike_loss_limit,get_atm,cheap_limit,take_profit,abs_not_percent,atm_open_limit,atm_close_limit, \
         short_type, long_type
     abs_not_percent = ini('abs_not_percent')
@@ -127,7 +126,6 @@ def read_ini():
     algo_long = ini('algo_long')
     if algo_long is None:
         algo_long = algo_short
-    every_day_trade = ini('every_day_trade')
     stop_loss = ini('stop_loss')
     take_profit = ini('take_profit')
     strike_loss_limit = ini('strike_loss_limit')
