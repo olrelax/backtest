@@ -285,7 +285,8 @@ def process_data(routine='w',arg_1=None,arg_2=None):
 
 
 # Adding subscription:
-# copy new files to main SPY_20YY_CBOE_SRC folder. Do d (yahoo), r (process opt), h (history with opt)
+# copy new files to main SPY_20YY_CBOE_SRC folder. Do 'd' (yahoo), {'r','<year>','<type>'} (process opt), 'h' (history with opt)
 if __name__ == '__main__':
-    process_data('h')
+    process_data('h','2022','C')
+
     # intraday('2020-02-24')

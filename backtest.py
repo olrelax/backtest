@@ -9,6 +9,7 @@ from transactions import close_positions, open_position
 from plot import plot
 from shutil import copyfile
 from learning import learn
+from prepare_data import process_data
 def archive():
     arc_filename = 'options-' + datetime.now().strftime('%Y-%m-%d--%H-%M')
     cmd = 'tar cvf ../Archive/%s.tar *.py config.ini  2>/dev/null' % arc_filename
@@ -22,37 +23,38 @@ def reset_test():
     gv.opts_full, gv.opts_full_next_year = None, None
 
 SHORT,LONG = -1, 1
-def make_res_df():
+def make_res_df_0():
     df = pd.DataFrame({'date': [epoc_start], 'stock': [0.0],
                        'open_date':[epoc_start],'expiration': [epoc_start],'strike': [0.0],'premium': [0.0],'last_price':[0.0],'margin_s': [0.0],'margin_l': [0.0],
                        'profit_s':[0.0],'profit_l':[0.0],
                        'profit_sum':[0.0],'details': [''],'right_strike':[0.0],'action':['']})
 
     return df
-def copy_z(z: Position,row: pd.Series):
-    if z.is_short():
-        row['margin_s'] = z.pos_margin()
-        row['margin_l'] = 0
-    elif z.is_long():
-        row['margin_l'] = z.pos_margin()
-        row['margin_s'] = 0
-    else:
-        row['margin_s'] = 0
-        row['margin_l'] = 0
+def make_res_df():
+    df = pd.DataFrame({'date': [epoc_start], 'stock': [0.0]})
+    return df
 
-    row['profit_s'] = gv.profit_s
-    row['profit_l'] = gv.profit_l
+def copy_z(z: Position,row: pd.Series):
+
+    row['open_date'] = d2s(z.get_open_date())
+    row['expiration'] = d2s(z.get_expiration())
+    row['strike'] = z.get_strike()
+    row['premium'] = z.get_enter_price()
+    row['last_price'] = z.get_last_price()
+    # if z.is_primary:
+    #    row['margin_1'] = z.pos_margin()
+    #    row['margin_2'] = 0
+    # else:
+    #    row['margin_1'] = 0
+    row['margin'] = z.pos_margin()
+    row['pl_1'] = gv.pl_1
+    row['pl_2'] = gv.pl_2
     row['profit_sum'] = gv.profit_sum
     row['details'] = z.comment
-    row['open_date'] = d2s(z.open_date())
-    row['expiration'] = d2s(z.expiration)
-    row['premium'] = z.enter_price
-    row['last_price'] = z.last_price
-    row['strike'] = z.strike
     row['stock'] = z.underlying
     row['right_strike'] = z.right_strike
     act = 'o' if z.is_open() else 'c' if z.is_closed() else 'err'
-    sl = 's' if z.is_short() else 'l' if z.is_long() else '???'
+    sl = '1' if z.is_primary else '2'
     row['action'] = act + sl
     if gv.get_atm:
         row['atm'] = z.atm
@@ -65,20 +67,23 @@ def del_items(za,del_list):
             new_za.append(za[i])
     return new_za
 #   ********************************  TRADE  *******************************************
+def get_latest_trade_day(date):
+    if date is None:
+        return gv.stock['date'].iloc[-1]
+    else:
+        return gv.stock.loc[gv.stock['date'] <= s2d(date)]['date'].iloc[-1]
 def backtest():
-    print('run trade...')
     if gv.stock is None:
         gv.stock = read_stock()
-    if gv.ed is None:
-        gv.ed = d2s(gv.stock['date'].iloc[-1])
     res = make_res_df()
     reset_test()
-    zsa = []
-    zla = []
-    gv.profit_s,gv.profit_l,gv.profit_sum = 0.,0.,0.
+    basket_1 = []
+    basket_2 = []
+    gv.pl_1,gv.pl_2,gv.profit_sum = 0.,0.,0.
     first_trade_day = s2d(gv.bd)
-    last_trade_day = s2d(gv.ed)
-    opts = None
+    last_trade_day = get_latest_trade_day(gv.ed)
+    gv.ed = d2s(last_trade_day)
+    opts_1,opts_2 = None,None
     gv.exclude_bound = gv.exclude_period.split(' ') if gv.exclude_period else None
     row = pd.Series(res.copy().iloc[0])
     profit_trades, loss_trades, trades, max_loss = 0, 0, 0, 0.0
@@ -91,87 +96,105 @@ def backtest():
             break
         volatility = q['volatility']
         row['date'] = d2s(date)
-        if date == s2d('2019-12-13'):
-            print()
+        if date == s2d('2021-02-01'):
+            print('bp')
         print(date)
-        opts = get_monthly_opts(date,opts,gv.short_type)
-        target_exp = add_days(date, gv.days2exp)
+        opts_1 = get_monthly_opts(date,opts_1,gv.option_type_1)
+        if gv.option_type_2 == gv.option_type_1:
+            opts_2 = opts_1
+        else:
+            opts_2 = get_monthly_opts(date,opts_2,gv.option_type_2)
+        target_exp_1 = add_days(date, gv.days2exp_1)
+        target_exp_2 = add_days(date, gv.days2exp_2)
         # --------------------------------- CLOSE ----------------------------
-        zsa_len = len(zsa)
-        del_list_s = []
-        del_list_l = []
-        for i in range(zsa_len):
-            day_pl = 0
-            zs = zsa[i]
-            close_positions(opts, date, zs, volatility, q_open)
-            if zs.close_date() == date and zs.is_closed():
-                gv.profit_sum += zs.pos_profit()
-                gv.profit_s += zs.pos_profit()
-                copy_z(zs, row)
-                res = res.append(row,ignore_index=True)
-                del_list_s.append(i)
-                day_pl = zs.pos_profit()
-                if day_pl > 0:
-                    profit_trades += 1
-                elif day_pl < 0:
-                    loss_trades += -1
-                trades += 1
-                if gv.long_param:
-                    zl = zla[i]
-                    close_positions(opts, date, zl, 0, q_open,zs)
-                    gv.profit_sum += zl.pos_profit()
-                    gv.profit_l += zl.pos_profit()
-                    day_pl += zl.pos_profit()
-                    copy_z(zl,row)
+        basket_1_len = len(basket_1)
+        basket_2_len = len(basket_2)
+        del_list_1 = []
+        del_list_2 = []
+        day_pl_1, day_pl_2 = 0,0
+        if gv.param_1:
+            for i in range(basket_1_len):
+                z1 = basket_1[i]
+                close_positions(opts_1, date, z1, volatility, q_open)
+                if z1.get_close_date() == date and z1.is_closed():
+                    gv.profit_sum += z1.pos_profit()
+                    gv.pl_1 += z1.pos_profit()
+                    copy_z(z1, row)
                     res = res.append(row,ignore_index=True)
-                    del_list_l.append(i)
+                    del_list_1.append(i)
+                    trade_pl_1 = z1.pos_profit()
+                    day_pl_1 += trade_pl_1
+                    trades += 1
 
-            max_loss = min(max_loss, day_pl)
-        zsa = del_items(zsa,del_list_s)
-        if gv.long_param:
-            zla = del_items(zla,del_list_l)
+        if gv.param_2:
+            for i in range(basket_2_len):
+                z2 = basket_2[i]
+                close_positions(opts_2, date, z2, 0, q_open)
+                if z2.get_close_date() == date and z2.is_closed():
+                    gv.profit_sum += z2.pos_profit()
+                    gv.pl_2 += z2.pos_profit()
+                    trade_pl_2 = z2.pos_profit()
+                    day_pl_2 += trade_pl_2
+                    copy_z(z2,row)
+                    res = res.append(row,ignore_index=True)
+                    del_list_2.append(i)
+
+        max_loss = min(max_loss, day_pl_1 + day_pl_2)
+        basket_1 = del_items(basket_1,del_list_1)
+        if gv.param_2:
+            basket_2 = del_items(basket_2,del_list_2)
         # --------------------------------- OPEN ----------------------------
         if date == last_trade_day:
             break
 
-        zs = Position(gv.short_type, SHORT)
-        open_position(opts, date, target_exp, zsa, zs, volatility)
-        if zs.is_open():
-            zsa.append(zs)
-            copy_z(zs,row)
-            res = res.append(row, ignore_index=True)
+        parent_position = None
+        z1 = Position(gv.option_type_1, gv.side_1,primary=True,call_pair_close=True)
+        if gv.param_1:
+            open_position(opts_1, date, gv.algo_1, target_exp_1, basket_1, z1, volatility,gv.param_1)
+            if z1.is_open():
+                basket_1.append(z1)
+                copy_z(z1,row)
+                res = res.append(row, ignore_index=True)
+                parent_position = z1
 
-            if gv.long_param:
-                zl = Position(gv.long_type, LONG)
-                if gv.algo_long == 'hedge_distance':
-                    long_param = zs.strike - gv.long_param
+        if gv.param_2:
+            z2 = Position(gv.option_type_2, gv.side_2)
+            if gv.algo_2[:5] == 'hedge':
+                if z1.is_open():
+                    if gv.algo_2 == 'hedge_distance':
+                        param_2 = parent_position.get_strike() - gv.param_2
+                    elif gv.algo_2 == 'hedge_discount':
+                        param_2 = parent_position.get_enter_price() * gv.param_2
+                    else:
+                        param_2 = None
                 else:
-                    long_param = None
-                open_position(opts, date, target_exp, zla, zl, volatility,long_param)
-                if zl.is_open():
-                    zla.append(zl)
-                    copy_z(zl,row)
-                    res = res.append(row, ignore_index=True)
+                    param_2 = None
+            else:
+                param_2 = gv.param_2
+            open_position(opts_2, date, gv.algo_2, target_exp_2, basket_2, z2, volatility,param_2)
+            if z2.is_open():
+                basket_2.append(z2)
+                copy_z(z2,row)
+                res = res.append(row, ignore_index=True)
 
-        if gv.long_param and not len(zsa) == len(zla):
-            exit('asymmetry detected')
 
-        listz(zsa,'eod state:')
-        if gv.long_param:
-            listz(zla,'eod state:')
+        listz(basket_1,'eod state:')
+        if gv.param_2:
+            listz(basket_2,'eod state:')
 
 
 # -------------------------------- END ITERATION -----------------------------------------
     prn('End', 'yellow')
     d_now = datetime.now()
     sd_now = datetime.strftime(d_now, '%dd%Hh%Mm%Ss')
-    gv.suffix = ' sp %.2f, lp %.2f' % (gv.short_param, gv.long_param if gv.long_param is not None else 0)
+    gv.suffix = ' sp %.2f, lp %.2f' % (gv.param_1, gv.param_2 if gv.param_2 is not None else 0)
     fn_base = '%s %s' % (sd_now,gv.suffix)
     res = res.reset_index(drop=True)
     res = res.drop(axis=0, index=0)
+    res = res[['date','stock','open_date','expiration','strike','premium','last_price','margin','pl_1','pl_2','profit_sum','details','action']]
+
     res.to_csv('../out/e-%s.csv' % fn_base, index=False)
     copyfile('config.ini','../out/i-%s.ini' % fn_base)
-    save_nn_input(res, gv.vlt_sample_size)
     archive()
     txt = 'profits=%d, losses=%d, trades=%d, max loss=%.2f' % (profit_trades,loss_trades,trades,max_loss)
     plot(fn_base,txt)
@@ -179,8 +202,8 @@ def backtest():
 #################################### END BACKTEST ########################################################
 def iterate_bt(test=False):
     gv.show = False
-    sp_start = gv.short_param
-    lp_start = gv.long_param
+    sp_start = gv.param_1
+    lp_start = gv.param_2
     sp_range = gv.ini('sp_range')
     lp_range = gv.ini('lp_range')
     sp_expr = gv.ini('sp_expr')
@@ -189,10 +212,10 @@ def iterate_bt(test=False):
 
         gv.trade_day_of_week = p +1
         for sp in range(sp_range):
-            gv.short_param = eval(sp_expr)
+            gv.param_1 = eval(sp_expr)
             for lp in range(lp_range):
-                gv.long_param = eval(lp_expr)
-                print('p=%d sp %.2f, lp %.3f' % (gv.trade_day_of_week,gv.short_param, gv.long_param))
+                gv.param_2 = eval(lp_expr)
+                print('p=%d sp %.2f, lp %.3f' % (gv.trade_day_of_week,gv.param_1, gv.param_2))
                 if not test:
                     backtest()
     system('say the task is done')
@@ -200,7 +223,6 @@ def iterate_bt(test=False):
 ############################################################################################
 def run(task=''):
     gv.read_ini()
-    gv.sample_len = get_nn([]) if gv.algo_short == 'nn' else gv.vlt_sample_size
 
     if task == '':
         backtest()
@@ -216,7 +238,17 @@ def run(task=''):
         iterate_bt(test=True)
     elif task == 'learn':
         learn()
-
+    elif task[:4] == 'data':
+        task_set = task.split(',')
+        if len(task_set) == 2:
+            process_data(task_set[1])
+        elif len(task_set) == 4:
+            process_data(task_set[1],task_set[2],task_set[3])
+        elif task == 'data':
+            process_data('d')
+            process_data('r','2022','P')
+            process_data('r','2022','C')
+            process_data('h')
 
 if __name__ == '__main__':
     a = gv.ini('task','')

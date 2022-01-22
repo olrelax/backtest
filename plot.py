@@ -17,24 +17,23 @@ def plot(src,txt=''):
         path = '../out/e-%s.csv' % src
         save = True
     df = pd.read_csv(path)
+    if gv.param_2 is None:
+        df = df.loc[(df['action'] == 'c1')]
+    else:
+        df = df.loc[df['action'] == 'c2']         # right day p/l appears after option_2 close
     df['date'] = pd.to_datetime(df['date'])
     df_date = df[['date']]
-    act_sl = 'cl' if gv.long_param else 'cs'
-    hide_open = gv.ini('hide_open')
     show_stock = gv.ini('show_stock')
     if gv.get_atm:
-        if gv.long_param is not None:
-            numeric_cols = ['stock','profit_s','profit_l','profit_sum','action','atm']
+        if gv.param_2 is not None:
+            numeric_cols = ['stock','pl_1','pl_2','profit_sum','action','atm']
         else:
-            numeric_cols = ['stock','profit_s','action','atm']
+            numeric_cols = ['stock','pl_1','action','atm']
     else:
-        if gv.long_param is not None:
-            numeric_cols = ['stock','profit_s','profit_l','profit_sum','action']
+        if gv.param_2 is not None:
+            numeric_cols = ['stock','pl_1','pl_2','profit_sum','action']
         else:
-            numeric_cols = ['stock','profit_s','action']
-    df_numeric = df[numeric_cols]
-    if hide_open:
-        df_numeric = df_numeric.loc[df['action'] == act_sl]
+            numeric_cols = ['stock','pl_1','action']
     df_numeric = df[numeric_cols].drop(columns='action')
     if show_stock:
         df_numeric = (df_numeric - df_numeric.mean()) / df_numeric.std()
@@ -44,6 +43,7 @@ def plot(src,txt=''):
 
     df = df_date.join(df_numeric)
     df = df.set_index('date')
+    df.to_csv('../out/last_plot.csv')
     ax = df.plot(figsize=(14, 8), subplots=False,title=txt)
     xtick = pd.date_range(start=df.index.min(), end=df.index.max(), freq='W')
     ax.set_xticks(xtick, minor=True)

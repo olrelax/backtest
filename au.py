@@ -11,26 +11,47 @@ from au import fl
 """
 
 def get_monthly_opts(date, opts,opt_type):
-    possible_exp = add_days(last_month_day(date), gv.days2exp + 5)
-    if opts is None:
-        gv.opts_annual = read_opt(date.year,date,opt_type)
-        opts = gv.opts_annual.loc[gv.opts_annual['quote_date'] >= date].loc[gv.opts_annual['quote_date'] <= possible_exp]
-    elif date.month > opts['quote_date'].iloc[0].month or date.year > opts['quote_date'].iloc[0].year:
-        if date.year == opts['quote_date'].iloc[0].year:
-            opts = gv.opts_annual.loc[gv.opts_annual['quote_date'] >= date].loc[gv.opts_annual['quote_date'] <= possible_exp]
-        else:
-            if gv.opts_annual_next_year['quote_date'].iloc[0].year == date.year:
-                gv.opts_annual = gv.opts_annual_next_year
+    possible_exp = add_days(last_month_day(date), max(gv.days2exp_1,gv.days2exp_2) + 5)
+    if opt_type == 'C':
+        if opts is None:
+            gv.opts_annual_C = read_opt(date.year,date,opt_type)
+            opts = gv.opts_annual_C.loc[gv.opts_annual_C['quote_date'] >= date].loc[gv.opts_annual_C['quote_date'] <= possible_exp]
+        elif date.month > opts['quote_date'].iloc[0].month or date.year > opts['quote_date'].iloc[0].year:
+            if date.year == opts['quote_date'].iloc[0].year:
+                opts = gv.opts_annual_C.loc[gv.opts_annual_C['quote_date'] >= date].loc[gv.opts_annual_C['quote_date'] <= possible_exp]
             else:
-                exit('hm...')
-            opts = gv.opts_annual.loc[gv.opts_annual['quote_date'] >= date].loc[gv.opts_annual['quote_date'] <= possible_exp]
-    else:
+                if gv.opts_annual_next_year_C['quote_date'].iloc[0].year == date.year:
+                    gv.opts_annual_C = gv.opts_annual_next_year_C
+                else:
+                    exit('hm...')
+                opts = gv.opts_annual_C.loc[gv.opts_annual_C['quote_date'] >= date].loc[gv.opts_annual_C['quote_date'] <= possible_exp]
+        else:
+            return opts
+        if possible_exp.year > opts['quote_date'].iloc[-1].year:
+            gv.opts_annual_next_year_C = read_opt(possible_exp.year,date,opt_type)
+            if gv.opts_annual_next_year_C is not None:
+                opts = opts.append(gv.opts_annual_next_year_C.loc[gv.opts_annual_next_year_C['quote_date'] <= possible_exp], ignore_index=True)
         return opts
-    if possible_exp.year > opts['quote_date'].iloc[-1].year:
-        gv.opts_annual_next_year = read_opt(possible_exp.year,date,opt_type)
-        if gv.opts_annual_next_year is not None:
-            opts = opts.append(gv.opts_annual_next_year.loc[gv.opts_annual_next_year['quote_date'] <= possible_exp], ignore_index=True)
-    return opts
+    else:
+        if opts is None:
+            gv.opts_annual_P = read_opt(date.year,date,opt_type)
+            opts = gv.opts_annual_P.loc[gv.opts_annual_P['quote_date'] >= date].loc[gv.opts_annual_P['quote_date'] <= possible_exp]
+        elif date.month > opts['quote_date'].iloc[0].month or date.year > opts['quote_date'].iloc[0].year:
+            if date.year == opts['quote_date'].iloc[0].year:
+                opts = gv.opts_annual_P.loc[gv.opts_annual_P['quote_date'] >= date].loc[gv.opts_annual_P['quote_date'] <= possible_exp]
+            else:
+                if gv.opts_annual_next_year_P['quote_date'].iloc[0].year == date.year:
+                    gv.opts_annual_P = gv.opts_annual_next_year_P
+                else:
+                    exit('hm...')
+                opts = gv.opts_annual_P.loc[gv.opts_annual_P['quote_date'] >= date].loc[gv.opts_annual_P['quote_date'] <= possible_exp]
+        else:
+            return opts
+        if possible_exp.year > opts['quote_date'].iloc[-1].year:
+            gv.opts_annual_next_year_P = read_opt(possible_exp.year,date,opt_type)
+            if gv.opts_annual_next_year_P is not None:
+                opts = opts.append(gv.opts_annual_next_year_P.loc[gv.opts_annual_next_year_P['quote_date'] <= possible_exp], ignore_index=True)
+        return opts
 
 
 def fl(arg):

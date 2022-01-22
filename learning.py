@@ -18,9 +18,8 @@ from au import fl
 
 def learn():
 
-    w = gv.ini('trade_day_of_week')
-    print(type(w))
-
+    a = 4
+    print(id(a))
 
 if __name__ == '__main__':
     learn()
