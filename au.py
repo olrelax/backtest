@@ -9,6 +9,11 @@ from inspect import currentframe, getframeinfo
 fl(getframeinfo(currentframe()))
 from au import fl
 """
+def get_latest_trade_day(date):
+    if date is None:
+        return gv.stock['date'].iloc[-1]
+    else:
+        return gv.stock.loc[gv.stock['date'] <= s2d(date)]['date'].iloc[-1]
 
 def get_monthly_opts(date, opts,opt_type):
     possible_exp = add_days(last_month_day(date), max(gv.days2exp_1,gv.days2exp_2) + 5)
@@ -144,6 +149,13 @@ def last_month_day(current_date):
 
 def add_days(dt, n):
     return dt + relativedelta(days=n)
+
+def add_work_days(dt, n):
+
+    dst = dt + relativedelta(days=n)
+    return dst + relativedelta(days=2) if dst.isoweekday() == 6 else dst + relativedelta(days=1) if dst.isoweekday() == 7 else dst
+
+
 def add_weeks(dt,n):
     return dt + relativedelta(weeks=n)
 def add_months(dt,n):

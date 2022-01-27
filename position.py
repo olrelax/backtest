@@ -5,56 +5,62 @@ def d2s(dtm,fmt='%Y-%m-%d'):
 def s2d(text,fmt='%Y-%m-%d'):
     return datetime.strptime(text,fmt)
 
-epoch_begin = datetime.strptime('1000-01-01', '%Y-%m-%d')
 
 class Position:
-    def __init__(self, opt_type, short_long,primary=False,call_pair_close=False):
+    def __init__(self, opt_type, short_long,primary=False):
         self.__option_type = opt_type
+        self.__opt_type_sign = -1 if opt_type == 'P' else 1
         self.__strike = 0.
         self.__side = -1 if short_long == 'S' else 1 if short_long == 'L' else 0
         self.__open_close_switch = 0
         self.__enter_price = 0.
-        self.__last_price = 0.
-        self.__expiration = epoch_begin
-        self.__open_date = epoch_begin
-        self.__close_date = epoch_begin
+        self.__current_price = 0.
+        self.__expiration = gv.epoc_start
+        self.__open_date = gv.epoc_start
+        self.__close_date = gv.epoc_start
         self.closing_reason = ''
         self.comment = ''
-        self.commission = 0.
+        self.close_commission = 0.
         self.underlying = 0
         self.right_strike = 0
         self.atm = 0
         self.close_time = None
-        self.call_pair_close = call_pair_close
+        self.__last_transaction_date = gv.epoc_start
         self.is_primary = primary
-    def get_option_type(self):
+    def option_type(self):
         return self.__option_type
-    def get_enter_price(self):
+    def enter_price(self):
         return self.__enter_price
-    def get_strike(self):
+    def strike(self):
         return self.__strike
-    def get_last_price(self):
-        return self.__last_price
-    def get_expiration(self):
+    def expiration(self):
         return self.__expiration
     def is_tradable(self):
         return abs(self.__side) > 0
     def is_open(self):
-        return self.__open_close_switch > 0
+        return self.__open_close_switch == 1
     def is_closed(self):
-        return self.__open_close_switch < 0
-    def is_virgin(self):
         return self.__open_close_switch == 0
     def is_short(self):
         return self.__side < 0
     def is_long(self):
         return self.__side > 0
-    def get_side(self):
+    def side(self):
         return self.__side
-    def get_close_date(self):
+    def close_date(self):
         return self.__close_date
-    def get_open_date(self):
+    def open_date(self):
         return self.__open_date
+    def last_transaction_date(self):
+        return self.__last_transaction_date
+    def set_current(self,price):
+        self.__current_price = price
+    def current(self):
+        return self.__current_price
+    def margin(self):
+        return (self.__current_price - self.__enter_price) * self.__side
+    def value(self):
+        return self.__current_price * self.__open_close_switch * self.__side
 
 
     def info(self,print_it=True,prefix=''):
@@ -65,7 +71,7 @@ class Position:
         elif self.is_closed():
             state = '%s %s open_date %s, expiration %s, strike %.1f, premium %.2f, closed %s, close price %.2f' %\
                     (self.__option_type,side, d2s(self.__open_date),d2s(self.__expiration),self.__strike,self.__enter_price,
-                     d2s(self.__close_date),self.__last_price)
+                     d2s(self.__close_date),self.__current_price)
         else:
             state = 'not set'
         info = '%s %s' % (prefix,state)
@@ -73,11 +79,6 @@ class Position:
             print(info)
         return info
 
-    def pos_profit(self):
-        return (self.__last_price - self.__enter_price) * self.__side - self.commission
-
-    def pos_margin(self):
-        return (self.__last_price - self.__enter_price) * self.__side
 
     def open_position(self, date, expiration, strike, premium):
 
@@ -89,20 +90,23 @@ class Position:
         self.__strike = strike
         self.__expiration = exp
         self.__enter_price = premium
-        self.__last_price = premium
+        self.__current_price = premium
         self.__open_date = dt
-        self.commission = gv.comm
+        self.__last_transaction_date = date
         return 1
 
-    def close_position(self, curr_opt_price,date,closing_reason,close_time):
+    def close_position(self, curr_opt_price,date,closing_reason,close_time,under):
         dt = s2d(date) if isinstance(date,str) else date
         if self.is_open():
             self.__open_close_switch = -1
-            self.__last_price = curr_opt_price
+            self.__current_price = curr_opt_price
             self.__close_date = dt
             self.closing_reason = closing_reason
-            self.commission = self.commission + gv.comm if not self.closing_reason[:3] == 'Exp' else self.commission
+            itm = (under - self.__strike) * self.__opt_type_sign > 0
+            self.close_commission = gv.comm if itm or not self.closing_reason[:3] == 'Exp' else 0.
             self.close_time = close_time
+            self.__open_close_switch = 0
+            self.__last_transaction_date = date
         else:
             exit('closing zero position')
 

@@ -1,25 +1,29 @@
 from configparser import ConfigParser, NoOptionError
+cash = 0
+portfolio = 0
 show = False
 param_1 = None
 param_2 = None
 vlt_close = -10
 vlt_open = -10
-do_not_open_the_same_day = False
 days2exp_1 = -10
 days2exp_2 = -10
 profit_sum = 0.0
-pl_1 = 0.0
-pl_2 = 0.0
+real_sum_1 = 0.0
+real_sum_2 = 0.0
+real_sum_and_curr_pl_1 = 0.0
+real_sum_and_curr_pl_2 = 0.0
 stock = None
 sample_len = 0
-comm = 0
+comm = 0.021
 max_price_diff = -10
 bd = ''
 ed = ''
 exclude_period = ''
 exclude_bound = ''
 suffix = ''
-trade_day_of_week = None
+trade_day_of_week_1 = None
+trade_day_of_week_2 = None
 opts_annual_C, opts_annual_next_year_C = None, None
 opts_annual_P, opts_annual_next_year_P = None, None
 algo_1 = ''
@@ -36,6 +40,13 @@ abs_not_percent = True
 atm_open_limit, atm_close_limit = 0, 0
 option_type_1, option_type_2 = '',''
 side_1, side_2 = '',''
+current_month = 0
+epoc_start = None
+def reset_test():
+    global current_month,opts_annual_C, opts_annual_next_year_C,opts_annual_P, opts_annual_next_year_P
+    current_month = 0
+    opts_annual_C,opts_annual_next_year_C, opts_annual_P, opts_annual_next_year_P = None, None, None, None
+
 def is_float(s):
     try:
         float(s)
@@ -99,10 +110,16 @@ def ini(entry_name, default_value=None):
     except NoOptionError:
         prn('no option: %s return default value' % entry_name,'yellow')
         return default_value
+def trade_scheme(ini_str):
+    trade_scheme_list = list(map(lambda x:x.split('='),ini_str.split(',')))
+    weekdays = trade_scheme_list[0][1]
+    weekdays = list(map(int,weekdays)) if len(weekdays)>1 else int(weekdays)
+    days_to_expiration = int(trade_scheme_list[1][1])
+    return weekdays,days_to_expiration
 
 def read_ini():
-    global comm, show, vlt_close, vlt_open, do_not_open_the_same_day, days2exp_1,days2exp_2, \
-        param_1, param_2, max_price_diff, bd,ed,exclude_period,trade_day_of_week, \
+    global comm, show, vlt_close, vlt_open, days2exp_1,days2exp_2, \
+        param_1, param_2, max_price_diff, bd,ed,exclude_period,trade_day_of_week_1,trade_day_of_week_2,  \
         algo_1, algo_2,stop_loss,forced_exit_date,intraday_tested,\
         strike_loss_limit,get_atm,cheap_limit,take_profit,abs_not_percent,atm_open_limit,atm_close_limit, \
         option_type_1, option_type_2,side_1,side_2
@@ -111,9 +128,6 @@ def read_ini():
     show = ini('show')
     vlt_close = ini('vlt_close')
     vlt_open = ini('vlt_open')
-    do_not_open_the_same_day = ini('do_not_open_the_same_day')
-    days2exp_1 = ini('days2exp_1')
-    days2exp_2 = ini('days2exp_2')
 
     param_1 = ini('param_1')
     param_2 = ini('param_2')
@@ -122,7 +136,10 @@ def read_ini():
     ed = ini('ed')
     forced_exit_date = ini('forced_exit_date')
     exclude_period = ini('exclude_period')
-    trade_day_of_week = ini('trade_day_of_week')
+    trade_scheme_1 = ini('trade_scheme_1')
+    trade_scheme_2 = ini('trade_scheme_2')
+    trade_day_of_week_1,days2exp_1 = trade_scheme(trade_scheme_1)
+    trade_day_of_week_2,days2exp_2 = trade_scheme(trade_scheme_2)
     intraday_tested = ini('intraday_tested')
     algo_1 = ini('algo_1')
     algo_2 = ini('algo_2')
@@ -139,3 +156,6 @@ def read_ini():
     option_type_2 = ini('option_type_2')
     side_1 = ini('side_1')
     side_2 = ini('side_2')
+    if algo_2[:5] == 'hedge':
+        if not trade_day_of_week_1 == trade_day_of_week_2 or not days2exp_1 == days2exp_2:
+            exit('trading scheme must be equal for hedging')

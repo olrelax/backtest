@@ -17,23 +17,12 @@ def plot(src,txt=''):
         path = '../out/e-%s.csv' % src
         save = True
     df = pd.read_csv(path)
-    if gv.param_2 is None:
-        df = df.loc[(df['action'] == 'c1')]
-    else:
-        df = df.loc[df['action'] == 'c2']         # right day p/l appears after option_2 close
+    # df = df.loc[(df['action'] == 'c2') | (df['action'] == 'v2')]  # right day p/l appears after option_2 close
+    df = df.loc[(df['action'] == 'c2') | (df['action'] == 'c1')]  # right day p/l appears after option_2 close
     df['date'] = pd.to_datetime(df['date'])
     df_date = df[['date']]
     show_stock = gv.ini('show_stock')
-    if gv.get_atm:
-        if gv.param_2 is not None:
-            numeric_cols = ['stock','pl_1','pl_2','profit_sum','action','atm']
-        else:
-            numeric_cols = ['stock','pl_1','action','atm']
-    else:
-        if gv.param_2 is not None:
-            numeric_cols = ['stock','pl_1','pl_2','profit_sum','action']
-        else:
-            numeric_cols = ['stock','pl_1','action']
+    numeric_cols = ['stock','unreal_sum_1','unreal_sum_2','portfolio','profit_sum','action']
     df_numeric = df[numeric_cols].drop(columns='action')
     if show_stock:
         df_numeric = (df_numeric - df_numeric.mean()) / df_numeric.std()
@@ -53,9 +42,10 @@ def plot(src,txt=''):
     ylim_top = gv.ini('ylim_top')
     if ylim_top is not None and ylim_top is not None:
         ax.set_ylim(ylim_bottom,ylim_top)
-    last_file = open('../out/last_file','w')
-    print('%s' % src,file=last_file)
-    last_file.close()
+    if not src == 'last':
+        last_file = open('../out/last_file','w')
+        print('%s' % src,file=last_file)
+        last_file.close()
     if save:
         full_fn_path = '../out/c-%s.png' % src
         plt.savefig(full_fn_path)

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime,timedelta
 import au
-from au import s2d,fl,d2s,add_days
+from au import s2d,fl,d2s,add_days, add_work_days
 from inspect import currentframe, getframeinfo
 import matplotlib.pyplot as plt
 from os import system
@@ -15,11 +15,10 @@ import globalvars as gv
 from inspect import currentframe, getframeinfo
 from au import fl
 
-
 def learn():
+    res = gv.trade_scheme(gv.ini('trade_scheme_1'))
+    print(res)
 
-    a = 4
-    print(id(a))
 
 if __name__ == '__main__':
     learn()
