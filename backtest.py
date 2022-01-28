@@ -26,7 +26,10 @@ def copy_z(date,z: Position):
     rec['open_date'] = d2s(z.open_date())
     rec['expiration'] = d2s(z.expiration())
     rec['strike'] = z.strike()
-    rec['margin'] = z.margin()
+    if z.is_primary:
+        rec['margin_1'] = z.margin()
+    else:
+        rec['margin_2'] = z.margin()
     rec['premium'] = z.enter_price()
     rec['current'] = z.current()
     rec['real_sum_1'] = real_sum_1
@@ -43,6 +46,7 @@ def copy_z(date,z: Position):
     rec['action'] = act + sl
     if gv.get_atm:
         rec['atm'] = z.atm
+    rec['eod_mark'] = ''
     return rec
 def find_exp(date,wd,days):
     stock = gv.stock
@@ -70,6 +74,7 @@ def backtest():
     profit_trades, loss_trades, trades, max_loss = 0, 0, 0, 0.0
     z1 = Position(gv.option_type_1, gv.side_1)
     z2 = Position(gv.option_type_2, gv.side_2)
+    eod_idx = None
     for idx, q in gv.stock.iterrows():
         date = q['date']
         open_instruction_1,open_instruction_2 = '',''
@@ -94,7 +99,9 @@ def backtest():
             opts_2 = get_monthly_opts(date,opts_2,gv.option_type_2)
         # --------------------------------- CLOSE ----------------------------
         day_pl_1, day_pl_2 = 0,0
+        day_active = False
         if gv.param_1 and z1.open_date() > gv.epoc_start:
+            day_active = True
             close_routine(opts_1, date, z1, volatility, q_open)
             if z1.close_date() == date:
                 trade_pl_1 = z1.margin() - z1.close_commission
@@ -112,6 +119,7 @@ def backtest():
                 df = df.append(copy_z(date,z1), ignore_index=True)
 
         if gv.param_2 and z2.open_date() > gv.epoc_start:
+            day_active = True
             close_routine(opts_2, date, z2, 0, q_open)
             if z2.close_date() == date:
                 trade_pl_2 = z2.margin() - z2.close_commission
@@ -127,8 +135,11 @@ def backtest():
                 real_sum_and_curr_pl_2 = real_sum_2 + z2.value()
                 portfolio = cash + z1.value() + z2.value()
                 df = df.append(copy_z(date,z2), ignore_index=True)
-
         max_loss = min(max_loss, day_pl_1 + day_pl_2)
+        if day_active:
+            if eod_idx is None:
+                eod_idx = df.columns.get_loc('eod_mark')
+            df.iloc[-1,eod_idx] = 'eod'
         # --------------------------------- OPEN ----------------------------
         if date == last_trade_day:
             break
@@ -173,6 +184,7 @@ def backtest():
     fn_base = '%s %s' % (sd_now,gv.suffix)
 
     df = df.reset_index(drop=True)
+    df = df[['date','stock','wd','open_date','expiration','strike','margin_1','margin_2','premium','current','real_sum_1','real_sum_2','unreal_sum_1','unreal_sum_2','profit_sum','portfolio','details','right_strike','action','eod_mark']]
     if not gv.ini('record_non_trade_days'):
         df = df.loc[(df['action'] != 'v1') & (df['action'] != 'v2')]
     save_csv(df,'../out/e-%s.csv' % fn_base)

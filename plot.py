@@ -18,9 +18,7 @@ def plot(src,txt=''):
         save = True
     df = pd.read_csv(path)
     df['date'] = pd.to_datetime(df['date'])
-    df = df.loc[(df['action'] != 'o1') | (df['action'] != 'o2')]
-    if gv.param_2 is not None:
-        df = df.loc[(df['action'] == 'c2') | (df['action'] == 'v2')]
+    df = df.loc[(df['action'] != 'o1') | (df['action'] != 'o2')].loc[df['eod_mark'] == 'eod']
 
     if gv.ini('plot_all'):
         numeric_cols = ['stock', 'real_sum_1', 'real_sum_2', 'unreal_sum_1', 'unreal_sum_2', 'portfolio', 'profit_sum']

@@ -95,8 +95,15 @@ def ts(date=datetime.now()):
 
 def d2s(dtm,fmt='%Y-%m-%d'):
     return datetime.strftime(dtm,fmt)
+
 def s2d(text,fmt='%Y-%m-%d'):
-    return datetime.strptime(text,fmt)
+    try:
+        s = datetime.strptime(text,fmt)
+    except Exception as e:
+        prn('s2d error:','red')
+        s = '{}'.format(e)
+        exit(s)
+    return s
 def intraday_tested_dates(dt):
     date = d2s(dt)
     dates_list = gv.intraday_tested.split(',')
