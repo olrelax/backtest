@@ -39,19 +39,20 @@ def select_opt(df_a, quote_date,exp_value,exp_mode,weekday,search_value,value_mo
     df_exp = select_expiration(df_a, quote_date, exp_value, exp_mode, weekday,opt_type)
     if df_exp is None:
         if exp_mode == 'exact_date' and quote_date == exp_value:
-            return -22, None,0,0
-        return 0, None, 0,0
-    df_on_exp = df_a.loc[df_a['quote_date'] == df_exp['expiration'].iloc[0]]
-    i = 0
-    exp_param = exp_value
-    while len(df_on_exp) == 0:
-        exp_param += exp_param
-        df_exp = select_expiration(df_a, quote_date,exp_param,exp_mode,opt_type)
-        df_on_exp = df_a.loc[df_a['quote_date'] == df_exp['expiration'].iloc[0]]
-        i += 1
-        if i > 1:
-            return 0, None, 0,0
-    right_strike = df_on_exp['underlying_ask_1545'].iloc[0]
+            return -22, None,0
+        return 0, None, 0
+#    df_on_exp = df_a.loc[df_a['quote_date'] == df_exp['expiration'].iloc[0]]
+#    i = 0
+#    exp_param = exp_value
+#    while len(df_on_exp) == 0:
+#        exp_param += exp_param
+#        df_exp = select_expiration(df_a, quote_date,exp_param,exp_mode,opt_type)
+#        df_on_exp = df_a.loc[df_a['quote_date'] == df_exp['expiration'].iloc[0]]
+#        i += 1
+#        if i > 1:
+#            return 0, None, 0,0
+
+#    right_strike = df_on_exp['underlying_ask_1545'].iloc[0]
     stock = df_exp['underlying_ask_1545'].iloc[0]
     sign = -1 if opt_type == 'P' else 1 if opt_type == 'C' else None
     if gv.get_atm or value_mode == 'base_on_atm':
@@ -88,7 +89,7 @@ def select_opt(df_a, quote_date,exp_value,exp_mode,weekday,search_value,value_mo
         if (opt_type == 'P' and not is_short) or (opt_type == 'C' and is_short):
             df = df.iloc[::-1]   # reverse
     else:
-        return -2, None, 0
+        return -2, None
     if len(df) == 0:
-        return -1, None, 0
-    return 0, df.iloc[0], atm_row, right_strike
+        return -1, None
+    return 0, df.iloc[0], atm_row

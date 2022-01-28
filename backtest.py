@@ -133,14 +133,14 @@ def backtest():
         if date == last_trade_day:
             break
         if gv.param_1 and z1.is_closed():
-            z = open_routine(gv.option_type_1, gv.side_1, True, opts_1,date, gv.algo_1, gv.days2exp_1, volatility,gv.param_1,open_instruction=open_instruction_1)
+            z = open_routine(gv.option_type_1, gv.side_1, True, opts_1,date, gv.algo_1, gv.days2exp_1,volatility,gv.param_1,open_instruction=open_instruction_1)
             if z is not None and z.open_date() == date:
+                if z.open_date() == z.expiration():
+                    exit('laja')
                 z1 = z
                 cash -= z1.enter_price() * z1.side() + gv.comm
                 portfolio = cash + z1.value() + z2.value()
                 df = df.append(copy_z(date,z), ignore_index=True)
-                if z.open_date() == z.expiration():
-                    exit('laja')
         if gv.param_2 and z2.is_closed():
             if gv.algo_2[:5] == 'hedge':
                 if z1 is not None:
@@ -154,8 +154,10 @@ def backtest():
                     param_2 = None
             else:
                 param_2 = gv.param_2
-            z = open_routine(gv.option_type_2, gv.side_2,False,opts_2,  date, gv.algo_2, gv.days2exp_2,gv.trade_day_of_week_2, volatility,param_2,open_instruction=open_instruction_2)
+            z = open_routine(gv.option_type_2, gv.side_2,False,opts_2,  date, gv.algo_2, gv.days2exp_2, volatility,param_2,open_instruction=open_instruction_2)
             if z is not None and z.open_date() == date:
+                if z.open_date() == z.expiration():
+                    exit('laja')
                 z2 = z
                 cash -= z2.enter_price() * z2.side() + gv.comm
                 portfolio = cash + z1.value() + z2.value()

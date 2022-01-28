@@ -18,7 +18,7 @@ def close_routine(opts, date, z:Position, vlt, under_930):
     try:
         strike = z.strike()
         exp = z.expiration()
-        ret_code, opt, atm, right_strike = select_opt(opts, date, exp, exp_mode='exact_date',weekday=None,search_value=strike,value_mode='exact_strike', opt_type=option_type,is_short=is_short)
+        ret_code, opt, atm = select_opt(opts, date, exp, exp_mode='exact_date',weekday=None,search_value=strike,value_mode='exact_strike', opt_type=option_type,is_short=is_short)
     except Exception as e:
         print(e)
         atm, opt, ret_code = None, None, -1
@@ -155,7 +155,7 @@ def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param
         if z.closing_reason == 'v':
             if z.close_date() == date:
                 return z
-        ret_code, opt, atm_row, right_strike = select_opt(opts, date, exp_param,  exp_mode='closest_date', weekday=trade_day_of_week,  search_value=param, value_mode=algo, opt_type=option_type, is_short=is_short)
+        ret_code, opt, atm_row = select_opt(opts, date, exp_param,  exp_mode='closest_date', weekday=trade_day_of_week,  search_value=param, value_mode=algo, opt_type=option_type, is_short=is_short)
         if opt is None:
             if ret_code < 0:
                 exit('%s: expired in %s days %s opt for open not found, code %d, er6' % (
@@ -179,7 +179,6 @@ def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param
         z.comment = 'OpenS' if z.is_short() else 'OpenL'
         z.comment = z.comment + option_type
         z.underlying = under
-        z.right_strike = right_strike
         z.atm = atm
         z.info(prefix='opening:')
     return z
