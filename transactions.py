@@ -18,7 +18,7 @@ def close_routine(opts, date, z:Position, vlt, under_930):
     try:
         strike = z.strike()
         exp = z.expiration()
-        ret_code, opt, atm, right_strike = select_opt(opts, date, exp, expiration_mode_search='exact_date',search_value=strike,value_search_mode='exact_strike', opt_type=option_type,is_short=is_short)
+        ret_code, opt, atm, right_strike = select_opt(opts, date, exp, exp_mode='exact_date',weekday=None,search_value=strike,value_mode='exact_strike', opt_type=option_type,is_short=is_short)
     except Exception as e:
         print(e)
         atm, opt, ret_code = None, None, -1
@@ -128,7 +128,7 @@ def check_trade_days(date,trade_day_of_week):
         days_list = list(map(int, trade_day_of_week.split(',')))
         return date.isoweekday() in days_list
 
-def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, target_exp, vlt, param, open_instruction=None):
+def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param, vlt, param, open_instruction=None):
     z = Position(opt_type, opt_side,primary)
     is_short = z.is_short()
     option_type = z.option_type()
@@ -155,12 +155,11 @@ def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, target_ex
         if z.closing_reason == 'v':
             if z.close_date() == date:
                 return z
-        ret_code, opt, atm_row, right_strike = select_opt(opts, date, target_exp,  expiration_mode_search='closest_date', search_value=param, value_search_mode=algo, opt_type=option_type, is_short=is_short)
-
+        ret_code, opt, atm_row, right_strike = select_opt(opts, date, exp_param,  exp_mode='closest_date', weekday=trade_day_of_week,  search_value=param, value_mode=algo, opt_type=option_type, is_short=is_short)
         if opt is None:
             if ret_code < 0:
-                exit('%s: exp %s %s opt for open not found, code %d, er6' % (
-                    d2s(date), d2s(target_exp), z.option_type, ret_code))
+                exit('%s: expired in %s days %s opt for open not found, code %d, er6' % (
+                    d2s(date), d2s(exp_param), z.option_type, ret_code))
             else:
                 print('%s skip open, no opts hist' % d2s(date))
                 return z
@@ -186,8 +185,8 @@ def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, target_ex
     return z
 
 def option_value(opts,date,z:Position):
-    ret_code, opt, dummy, dummy = select_opt(opts, date, z.expiration(), expiration_mode_search='exact_date',
-                                             search_value=z.strike(), value_search_mode='exact_strike', opt_type=z.option_type(),is_short=z.is_short())
+    ret_code, opt, dummy, dummy = select_opt(opts, date, z.expiration(), exp_mode='exact_date',weekday=None,
+                                             search_value=z.strike(), value_mode='exact_strike', opt_type=z.option_type(),is_short=z.is_short())
     if opt is not None:
         return opt['bid_eod'] if z.side() > 0 else opt['ask_eod'] if z.side() < 0 else 0
     return 0.0

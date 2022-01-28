@@ -1,6 +1,10 @@
 from configparser import ConfigParser, NoOptionError
-cash = 0
-portfolio = 0
+# cash = 0
+# portfolio = 0
+# real_sum_1 = 0.0
+# real_sum_2 = 0.0
+# real_sum_and_curr_pl_1 = 0.0
+# real_sum_and_curr_pl_2 = 0.0
 show = False
 param_1 = None
 param_2 = None
@@ -8,15 +12,10 @@ vlt_close = -10
 vlt_open = -10
 days2exp_1 = -10
 days2exp_2 = -10
-profit_sum = 0.0
-real_sum_1 = 0.0
-real_sum_2 = 0.0
-real_sum_and_curr_pl_1 = 0.0
-real_sum_and_curr_pl_2 = 0.0
+# profit_sum = 0.0
 stock = None
 sample_len = 0
 comm = 0.021
-max_price_diff = -10
 bd = ''
 ed = ''
 exclude_period = ''
@@ -113,13 +112,26 @@ def ini(entry_name, default_value=None):
 def trade_scheme(ini_str):
     trade_scheme_list = list(map(lambda x:x.split('='),ini_str.split(',')))
     weekdays = trade_scheme_list[0][1]
-    weekdays = list(map(int,weekdays)) if len(weekdays)>1 else int(weekdays)
-    days_to_expiration = int(trade_scheme_list[1][1])
+    weekdays = list(map(int,weekdays)) if len(weekdays) > 1 else int(weekdays) if len(weekdays) > 0 else 0
+    expiration_term = trade_scheme_list[1][1]
+    if len(expiration_term) == 0:
+        days_to_expiration = 0
+    elif expiration_term[-1:] == 'w':
+        days_to_expiration = int(expiration_term[:-1]) * 5
+    elif expiration_term[-1:] == 'm':
+        days_to_expiration = int(expiration_term[:-1]) * 20
+    else:
+        days_to_expiration = int(expiration_term)
+    if weekdays == 0:
+        if days_to_expiration > 0:
+            exit('wrong scheme %s. Unset expiration' % ini_str)
+    elif days_to_expiration % 5 > 0:
+        exit('wrong scheme %s' % ini_str)
     return weekdays,days_to_expiration
 
 def read_ini():
     global comm, show, vlt_close, vlt_open, days2exp_1,days2exp_2, \
-        param_1, param_2, max_price_diff, bd,ed,exclude_period,trade_day_of_week_1,trade_day_of_week_2,  \
+        param_1, param_2, bd,ed,exclude_period,trade_day_of_week_1,trade_day_of_week_2,  \
         algo_1, algo_2,stop_loss,forced_exit_date,intraday_tested,\
         strike_loss_limit,get_atm,cheap_limit,take_profit,abs_not_percent,atm_open_limit,atm_close_limit, \
         option_type_1, option_type_2,side_1,side_2
@@ -131,7 +143,6 @@ def read_ini():
 
     param_1 = ini('param_1')
     param_2 = ini('param_2')
-    max_price_diff = ini('max_price_diff')
     bd = ini('bd')
     ed = ini('ed')
     forced_exit_date = ini('forced_exit_date')

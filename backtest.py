@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime
-from au import prn, s2d, d2s, add_work_days,read_stock,get_monthly_opts,get_latest_trade_day
+from au import prn, s2d, d2s, add_work_days,read_stock,get_monthly_opts,get_latest_trade_day,save_csv
 from os import system
 import globalvars as gv
 from position import Position,listz
@@ -18,39 +18,50 @@ def archive():
 gv.epoc_start = datetime.strptime('0010-01-01', '%Y-%m-%d')
 
 SHORT,LONG = -1, 1
-
+cash,real_sum_1,real_sum_2,real_sum_and_curr_pl_1,real_sum_and_curr_pl_2,profit_sum, portfolio = 0,0,0,0,0,0,0
 def copy_z(date,z: Position):
     rec = pd.Series({'date': [gv.epoc_start], 'stock': [0.0]})
     rec['date'] = date
+    rec['wd'] = date.isoweekday()
     rec['open_date'] = d2s(z.open_date())
     rec['expiration'] = d2s(z.expiration())
     rec['strike'] = z.strike()
+    rec['margin'] = z.margin()
     rec['premium'] = z.enter_price()
     rec['current'] = z.current()
-    rec['real_sum_1'] = gv.real_sum_1
-    rec['real_sum_2'] = gv.real_sum_2
-    rec['unreal_sum_1'] = gv.real_sum_and_curr_pl_1
-    rec['unreal_sum_2'] = gv.real_sum_and_curr_pl_2
-    rec['profit_sum'] = gv.profit_sum
-    rec['portfolio'] = gv.portfolio
+    rec['real_sum_1'] = real_sum_1
+    rec['real_sum_2'] = real_sum_2
+    rec['unreal_sum_1'] = real_sum_and_curr_pl_1
+    rec['unreal_sum_2'] = real_sum_and_curr_pl_2
+    rec['profit_sum'] = profit_sum
+    rec['portfolio'] = portfolio
     rec['details'] = z.comment
     rec['stock'] = z.underlying
     rec['right_strike'] = z.right_strike
-    act = 'o' if z.is_open() and date == z.open_date() else 'v' if  z.is_open() else 'c' if z.is_closed() else 'err'
+    act = 'o' if z.is_open() and date == z.open_date() else 'v' if z.is_open() else 'c' if z.is_closed() else 'err'
     sl = '1' if z.is_primary else '2'
     rec['action'] = act + sl
     if gv.get_atm:
         rec['atm'] = z.atm
     return rec
-
+def find_exp(date,wd,days):
+    stock = gv.stock
+    estimate_date = add_work_days(date,days)
+    stock['weekday'] = pd.Series(map(lambda x:x.isoweekday(), stock['date']))
+    stock1 = stock.loc[stock['weekday'] == wd]
+    stock2 = stock1.loc[stock1['date'] > date]
+    stock3 = stock2.iloc[(stock2['date'] - estimate_date).abs().argsort()]
+    exp = stock3['date'].iloc[0]
+    return exp
 
 #   ********************************  TRADE  *******************************************
 def backtest():
+    global cash,real_sum_1,real_sum_2,real_sum_and_curr_pl_1,real_sum_and_curr_pl_2,profit_sum, portfolio
+    cash, real_sum_1, real_sum_2, real_sum_and_curr_pl_1, real_sum_and_curr_pl_2, profit_sum, portfolio = 0, 0, 0, 0, 0, 0, 0
     if gv.stock is None:
         gv.stock = read_stock()
-    res = pd.DataFrame([])
+    df = pd.DataFrame([])
     gv.reset_test()
-    gv.pl_1,gv.pl_2,gv.profit_sum = 0.,0.,0.
     first_trade_day = s2d(gv.bd)
     last_trade_day = get_latest_trade_day(gv.ed)
     gv.ed = d2s(last_trade_day)
@@ -70,8 +81,8 @@ def backtest():
         y = date.year
         m = date.month
         d = date.day
-        if y == 2020:
-            if m == 1:
+        if y == 2018:
+            if m == 5:
                 if d == 21:
                     print()
         print(date)
@@ -81,52 +92,55 @@ def backtest():
             opts_2 = opts_1
         else:
             opts_2 = get_monthly_opts(date,opts_2,gv.option_type_2)
-        target_exp_1 = add_work_days(date, gv.days2exp_1)
-        target_exp_2 = add_work_days(date, gv.days2exp_2)
         # --------------------------------- CLOSE ----------------------------
         day_pl_1, day_pl_2 = 0,0
         if gv.param_1 and z1.open_date() > gv.epoc_start:
             close_routine(opts_1, date, z1, volatility, q_open)
             if z1.close_date() == date:
                 trade_pl_1 = z1.margin() - z1.close_commission
-                gv.profit_sum += trade_pl_1
-                gv.real_sum_1 += trade_pl_1
-                gv.cash += z1.current() * z1.side() - z1.close_commission
-                gv.portfolio = gv.cash + z2.value()
+                profit_sum += trade_pl_1
+                real_sum_1 += trade_pl_1
+                real_sum_and_curr_pl_1 = real_sum_1
+                cash += z1.current() * z1.side() - z1.close_commission
+                portfolio = cash + z2.value()   # that's right, z2, not z1
                 trades += 1
                 open_instruction_1 = 'force_open'
-            else:
-                gv.real_sum_and_curr_pl_1 = gv.real_sum_1 + z1.value()
-                gv.portfolio = gv.cash + z1.value() + z2.value()
-            res = res.append(copy_z(date,z1), ignore_index=True)
+                df = df.append(copy_z(date,z1), ignore_index=True)
+            elif z1.is_open():
+                real_sum_and_curr_pl_1 = real_sum_1 + z1.value()
+                portfolio = cash + z1.value() + z2.value()
+                df = df.append(copy_z(date,z1), ignore_index=True)
 
         if gv.param_2 and z2.open_date() > gv.epoc_start:
             close_routine(opts_2, date, z2, 0, q_open)
             if z2.close_date() == date:
                 trade_pl_2 = z2.margin() - z2.close_commission
-                gv.profit_sum += trade_pl_2
-                gv.real_sum_2 += trade_pl_2
-                gv.cash += z2.current() * z2.side() - z2.close_commission
-                gv.portfolio = gv.cash + z1.value()
+                profit_sum += trade_pl_2
+                real_sum_2 += trade_pl_2
+                real_sum_and_curr_pl_2 = real_sum_2
+                cash += z2.current() * z2.side() - z2.close_commission
+                portfolio = cash + z1.value()  # that's right, z1, not z2
                 trades += 1
                 open_instruction_2 = 'force_open'
-            else:
-                gv.real_sum_and_curr_pl_2 = gv.real_sum_2 + z2.value()
-                gv.portfolio = gv.cash + z1.value() + z2.value()
-            res = res.append(copy_z(date,z2), ignore_index=True)
+                df = df.append(copy_z(date,z2), ignore_index=True)
+            elif z2.is_open():
+                real_sum_and_curr_pl_2 = real_sum_2 + z2.value()
+                portfolio = cash + z1.value() + z2.value()
+                df = df.append(copy_z(date,z2), ignore_index=True)
 
         max_loss = min(max_loss, day_pl_1 + day_pl_2)
         # --------------------------------- OPEN ----------------------------
         if date == last_trade_day:
             break
         if gv.param_1 and z1.is_closed():
-            z = open_routine(gv.option_type_1, gv.side_1, True, opts_1,date, gv.algo_1, target_exp_1, volatility,gv.param_1,open_instruction=open_instruction_1)
+            z = open_routine(gv.option_type_1, gv.side_1, True, opts_1,date, gv.algo_1, gv.days2exp_1, volatility,gv.param_1,open_instruction=open_instruction_1)
             if z is not None and z.open_date() == date:
                 z1 = z
-                gv.cash -= z1.enter_price() * z1.side() + gv.comm
-                gv.portfolio = gv.cash + z1.value() + z2.value()
-                res = res.append(copy_z(date,z), ignore_index=True)
-
+                cash -= z1.enter_price() * z1.side() + gv.comm
+                portfolio = cash + z1.value() + z2.value()
+                df = df.append(copy_z(date,z), ignore_index=True)
+                if z.open_date() == z.expiration():
+                    exit('laja')
         if gv.param_2 and z2.is_closed():
             if gv.algo_2[:5] == 'hedge':
                 if z1 is not None:
@@ -140,12 +154,12 @@ def backtest():
                     param_2 = None
             else:
                 param_2 = gv.param_2
-            z = open_routine(gv.option_type_2, gv.side_2,False,opts_2,  date, gv.algo_2, target_exp_2,  volatility,param_2,open_instruction=open_instruction_2)
+            z = open_routine(gv.option_type_2, gv.side_2,False,opts_2,  date, gv.algo_2, gv.days2exp_2,gv.trade_day_of_week_2, volatility,param_2,open_instruction=open_instruction_2)
             if z is not None and z.open_date() == date:
                 z2 = z
-                gv.cash -= z2.enter_price() * z2.side() + gv.comm
-                gv.portfolio = gv.cash + z1.value() + z2.value()
-                res = res.append(copy_z(date,z), ignore_index=True)
+                cash -= z2.enter_price() * z2.side() + gv.comm
+                portfolio = cash + z1.value() + z2.value()
+                df = df.append(copy_z(date,z), ignore_index=True)
 
 
 
@@ -156,12 +170,10 @@ def backtest():
     gv.suffix = ' sp %.2f, lp %.2f' % (gv.param_1, gv.param_2 if gv.param_2 is not None else 0)
     fn_base = '%s %s' % (sd_now,gv.suffix)
 
-    res = res.reset_index(drop=True)
-    res = res.loc[(res['action'] == 'o1') | (res['action'] == 'o2') | (res['action'] == 'c1') | (res['action'] == 'c2')]
-    # res['portfolio'] = res['portfolio'] - res['portfolio'].iloc[0]
-    # res = res[['date','stock','open_date','expiration','strike','premium','last_price','margin_1','margin_2','pl_1','pl_2','profit_sum','cash','details','action']]
-
-    res.to_csv('../out/e-%s.csv' % fn_base, index=False)
+    df = df.reset_index(drop=True)
+    if not gv.ini('record_non_trade_days'):
+        df = df.loc[(df['action'] != 'v1') & (df['action'] != 'v2')]
+    save_csv(df,'../out/e-%s.csv' % fn_base)
     copyfile('config.ini','../out/i-%s.ini' % fn_base)
     archive()
     txt = 'profits=%d, losses=%d, trades=%d, max loss=%.2f' % (profit_trades,loss_trades,trades,max_loss)
@@ -216,6 +228,8 @@ def run(task=''):
             process_data('r','2022','P')
             process_data('r','2022','C')
             process_data('h')
+            process_data('wd','2022','P')
+            process_data('wd','2022','C')
 
 if __name__ == '__main__':
     a = gv.ini('task','')

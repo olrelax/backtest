@@ -67,7 +67,8 @@ def read_stock():
     stock = pd.read_csv('../data/spy.csv')
     stock['date'] = pd.to_datetime(stock['date'])
     start_date = add_months(s2d(gv.bd),-1)
-    stock = stock[stock['date'] >= start_date].copy().reset_index(drop=True)
+    stock_1 = stock[stock['date'] >= start_date]
+    stock = stock_1[stock_1['date'] >= start_date].copy().reset_index(drop=True)
     return stock
 
 last_year = 3200
@@ -163,6 +164,6 @@ def add_months(dt,n):
 
 
 
-
-
+def save_csv(df,fn):
+    df.to_csv(fn, index=False)
 

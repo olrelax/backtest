@@ -67,6 +67,7 @@ def process_cboe_source(year, option_type):
             rf = rf.append(df.copy())
         i += 1
     fn = '../data/SPY_CBOE_%s_%s.csv' % (year,option_type)
+    # rf['weekday'] = pd.Series(map(lambda x:x.isoweekday(), rf['quote_date']))
     rf.reset_index(drop=True).to_csv(fn)
     print('saved %s' % fn)
 def cat():
@@ -258,35 +259,44 @@ def intraday(date,bottom=None,top=None):
     df.to_csv('%s/%s.csv' % (path,date),index=False)
     print(df.info())
 
+def weekday(year,option_type):
+    fn = '../data/SPY_CBOE_%s_%s.csv' % (year,option_type)
+    df = pd.read_csv('../data/%s' % fn)
+    df['quote_date'] = pd.to_datetime(df['quote_date'])
+    df['expiration'] = pd.to_datetime(df['expiration'])
+    df['weekday'] = pd.Series(map(lambda x:x.isoweekday(), df['quote_date']))
+    df['exp_weekday'] = pd.Series(map(lambda x:x.isoweekday(), df['expiration']))
+    df.to_csv('../data/%s' % fn, index=False)
 
-def process_data(routine='w',arg_1=None,arg_2=None):
+def process_data(ch,arg_1=None,arg_2=None):
     spy_path = '../data/spy.csv'
-    for ch in routine:
-        if ch == 'h':
-            make_history_with_opt('2018-01-01').to_csv(spy_path, index=False)
-        elif ch == 'v':
-            calc_vlt(spy_path).to_csv(spy_path, index=False)
-        elif ch == 'd':
-            download_yahoo('2017-01-01','SPY')
-        elif ch == 'p':
-            drop_last_row(spy_path)
-        elif ch == 'w':
-            view()
-        elif ch == 'r':
-            process_cboe_source(year=arg_1,option_type=arg_2)
-        elif ch == 'a':
-            append_cboe('../data/SPY_2021_CBOE_SRC/UnderlyingOptionsEODQuotes_2021-12-31.csv', option_type='P')
-        elif ch == 't':
-            cat()
-        elif ch == 'y':
-            add_from_yahoo(update=True)
-        elif ch == 'n':
-            add_new_row_manually(spy_path, '2021-12-16', 471.3, 464.86, 469.72, 470.65).to_csv(spy_path, index=False)
+    if ch == 'h':
+        make_history_with_opt('2018-01-01').to_csv(spy_path, index=False)
+    elif ch == 'v':
+        calc_vlt(spy_path).to_csv(spy_path, index=False)
+    elif ch == 'd':
+        download_yahoo('2017-01-01','SPY')
+    elif ch == 'p':
+        drop_last_row(spy_path)
+    elif ch == 'view':
+        view()
+    elif ch == 'r':
+        process_cboe_source(year=arg_1,option_type=arg_2)
+    elif ch == 'a':
+        append_cboe('../data/SPY_2021_CBOE_SRC/UnderlyingOptionsEODQuotes_2021-12-31.csv', option_type='P')
+    elif ch == 't':
+        cat()
+    elif ch == 'y':
+        add_from_yahoo(update=True)
+    elif ch == 'n':
+        add_new_row_manually(spy_path, '2021-12-16', 471.3, 464.86, 469.72, 470.65).to_csv(spy_path, index=False)
+    elif ch == 'wd':
+        weekday(year=arg_1,option_type=arg_2)
+
+
 
 
 # Adding subscription:
 # copy new files to main SPY_20YY_CBOE_SRC folder. Do 'd' (yahoo), {'r','<year>','<type>'} (process opt), 'h' (history with opt)
 if __name__ == '__main__':
-    process_data('h','2022','C')
-
-    # intraday('2020-02-24')
+    process_data('wd','2022','C')
