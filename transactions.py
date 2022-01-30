@@ -10,7 +10,7 @@ def ntn(v):
     return v is not None
 
 
-def close_routine(opts, date, z:Position, vlt, under_930):
+def close_routine(opts, date, z:Position, under_930):
     if z is None or not z.is_open():
         return
     is_short,  is_long = z.is_short(), z.is_long()
@@ -41,7 +41,6 @@ def close_routine(opts, date, z:Position, vlt, under_930):
     under_1545 = opt['underlying_bid_1545'] if is_short else opt['underlying_ask_1545']
     under_eod = opt['underlying_bid_eod'] if is_short else opt['underlying_ask_eod']
     expired_criteria = date == z.expiration()
-    vlt_criteria = vlt > gv.vlt_close if ntn(gv.vlt_close) and option_type == 'P' else False
     exclude_period_criteria = s2d(gv.exclude_bound[0]) <= date < s2d(gv.exclude_bound[1]) if ntn(gv.exclude_bound) else False
     date_criteria = exclude_period_criteria or date == s2d(gv.ed)
     strike_loss_limit_criteria_930 = is_short and ntn(gv.strike_loss_limit) and under_930 < z.strike() - gv.strike_loss_limit
@@ -92,10 +91,6 @@ def close_routine(opts, date, z:Position, vlt, under_930):
             close_price = opt[field] if stock_above_strike > 0 else 0.0
         closing_reason = 'Expired'
         close_time = 1600
-    elif vlt_criteria:
-        close_price = opt['bid_1545'] if z.is_long() else opt['ask_1545']
-        closing_reason = 'Forced_vlt'
-        close_time = 1545
     elif date_criteria:
         close_price = opt['bid_1545'] if z.is_long() else opt['ask_1545']
         closing_reason = 'Forced_date'
@@ -128,25 +123,29 @@ def check_trade_days(date,trade_day_of_week):
         days_list = list(map(int, trade_day_of_week.split(',')))
         return date.isoweekday() in days_list
 
-def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param, vlt, param, open_instruction=None):
+def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param,  param, open_instruction=None):
     z = Position(opt_type, opt_side,primary)
     is_short = z.is_short()
     option_type = z.option_type()
-    vlt_open_criteria = vlt < gv.vlt_open if ntn(gv.vlt_open) and z.option_type == 'P' else vlt > gv.vlt_open if ntn(
-        gv.vlt_open) and z.option_type == 'C' else True
     exclude_date_criteria = s2d(gv.exclude_bound[0]) <= date < s2d(gv.exclude_bound[1]) if gv.exclude_bound is not None else False
-    trade_day_of_week = gv.trade_day_of_week_1 if z.is_primary else gv.trade_day_of_week_2
-    weekday_criteria = check_trade_days(date,trade_day_of_week)
-    forced_exit = date == s2d(gv.forced_exit_date) if ntn(gv.forced_exit_date) else False
-    forced_open_date_1 = gv.ini('forced_open_date_1')
-    if forced_open_date_1 is not None:
-        forced_open_date_list = forced_open_date_1.split(',')
-        forced_date_open = (z.is_primary and d2s(date) in forced_open_date_list)
+    force_open = False
+    open_weekday = 0
+    if open_instruction is None:
+        open_weekday = gv.weekday_1 if z.is_primary else gv.weekday_2
+    elif open_instruction == 'force_open':
+        force_open = True
     else:
-        forced_date_open = False
-    day_criteria = weekday_criteria or open_instruction == 'force_open' or forced_date_open
+        instruction = open_instruction.split('=')
+        if instruction[0] == 'weekday':
+            open_weekday = int(instruction[1])
+
+    weekday_criteria = date.isoweekday() == open_weekday
+    exp_weekday = gv.weekday_1 if z.is_primary else gv.weekday_2
+    forced_exit = date == s2d(gv.forced_exit_date) if ntn(gv.forced_exit_date) else False
+    not_skip_date_criteria = date not in gv.skip_dates_list
+    day_criteria = (weekday_criteria or force_open) and not_skip_date_criteria
     if algo in ('base_on_atm', 'nn', 'distance', 'hedge_distance','hedge_discount', 'fixprice'):
-        open_criteria = not z.is_open() and not forced_exit and vlt_open_criteria and day_criteria and not exclude_date_criteria
+        open_criteria = not z.is_open() and not forced_exit and day_criteria and not exclude_date_criteria
     elif algo == 'get_right_atm':
         open_criteria = is_short
     else:
@@ -155,7 +154,7 @@ def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param
         if z.closing_reason == 'v':
             if z.close_date() == date:
                 return z
-        ret_code, opt, atm_row = select_opt(opts, date, exp_param,  exp_mode='closest_date', weekday=trade_day_of_week,  search_value=param, value_mode=algo, opt_type=option_type, is_short=is_short)
+        ret_code, opt, atm_row = select_opt(opts, date, exp_param,  exp_mode='closest_date', weekday=exp_weekday,  search_value=param, value_mode=algo, opt_type=option_type, is_short=is_short)
         if opt is None:
             if ret_code < 0:
                 exit('%s: expired in %s days %s opt for open not found, code %d, er6' % (
@@ -164,8 +163,6 @@ def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param
                 print('%s skip open, no opts hist' % d2s(date))
                 return z
         exp = opt['expiration']
-        if exp > s2d(gv.ed):
-            return z
         atm = atm_row['bid_1545'] if atm_row is not None else None
         strike = opt['strike']
         price_1545 = opt['bid_1545'] if z.is_short() else opt['ask_1545']

@@ -14,10 +14,8 @@ import globalvars as gv
 
 from inspect import currentframe, getframeinfo
 from au import fl
-import sftpclient as cl
 def learn():
-    c = cl.SFTPClient('sftp.datashop.livevol.com','olrelax_gmail_com','Hiwiehi0fz1$',False)
-    c.download('subscriptions/order_000025299/item_000030286/UnderlyingOptionsEODQuotes_2021-12-27.zip')
+    pass
 
-
-learn()
+if __name__ == '__main__':
+    learn()

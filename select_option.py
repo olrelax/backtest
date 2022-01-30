@@ -1,7 +1,7 @@
 import pandas as pd
 import globalvars as gv
 from au import prn,add_work_days,s2d
-def select_expiration(df_a, quote_date,exp_param,exp_mode,weekday,opt_type):
+def select_expiration(df_a, quote_date,exp_param,exp_mode,exp_weekday,opt_type):
     qd = quote_date
     df = df_a.loc[df_a['option_type'] == opt_type]
     if len(df) == 0:
@@ -10,11 +10,15 @@ def select_expiration(df_a, quote_date,exp_param,exp_mode,weekday,opt_type):
     if len(df) == 0:
         return None
     if exp_mode == 'closest_date':    # not exact expiration date
-        est_exp = add_work_days(quote_date,exp_param)
-        df = df.loc[df['exp_weekday'] == weekday].loc[df['expiration'] > quote_date]
-        if len(df) == 0:
-            return None
-        df = df.iloc[(df['expiration'] - est_exp).abs().argsort()]   # exact, before and after dates
+        if exp_param >0:
+            days2exp = exp_param
+            shift = quote_date.isoweekday() - exp_weekday
+            est_exp = add_work_days(quote_date,days2exp - shift)
+            df = df.loc[df['expiration'] >= est_exp]
+            # df = df.iloc[(df['expiration']).argsort()]
+        else:
+            df = df.loc[df['expiration'] > quote_date]
+            #df = df.iloc[(df['expiration']).argsort()]
         if len(df) > 0:
             exp = df['expiration'].iloc[0]
         else:

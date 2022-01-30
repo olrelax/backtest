@@ -2,13 +2,15 @@ import pandas as pd
 from os import walk
 from dateutil.relativedelta import *
 from datetime import datetime,timedelta
-from au import s2d, d2s,prn
+from au import s2d, d2s,prn,add_days
 from os import system
 import time
 import urllib.request
 import urllib.error
 from io import StringIO
 import ssl
+import paramiko
+import zipfile
 
 
 
@@ -268,6 +270,30 @@ def weekday(year,option_type):
     df['exp_weekday'] = pd.Series(map(lambda x:x.isoweekday(), df['expiration']))
     df.to_csv('../data/%s' % fn, index=False)
 
+def get_sftp_cboe(month=None,day=None):
+    if month is None or day is None:
+        now = datetime.now()
+        yes = add_days(now,-1)
+        month = yes.month
+        day = yes.day
+    filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,day)
+    filepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
+    localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
+    # paramiko.util.log_to_file("paramiko.log")
+    host, port = "sftp.datashop.livevol.com", 22
+    transport = paramiko.Transport((host, port))
+    username, password = "olrelax_gmail_com", "Hiwiehi0fz1$"
+    transport.connect(None, username, password)
+    sftp = paramiko.SFTPClient.from_transport(transport)
+    sftp.get(filepath, localpath)
+    if sftp: sftp.close()
+    if transport: transport.close()
+    d = '../data/SPY_2022_CBOE_SRC/'
+    with zipfile.ZipFile(localpath, 'r') as zip_ref:
+        zip_ref.extractall(d)
+    print('ls:')
+    system('ls %s | grep %s' % (d,filename[:-4]))
+    print('done')
 def process_data(ch,arg_1=None,arg_2=None):
     spy_path = '../data/spy.csv'
     if ch == 'h':
@@ -292,6 +318,8 @@ def process_data(ch,arg_1=None,arg_2=None):
         add_new_row_manually(spy_path, '2021-12-16', 471.3, 464.86, 469.72, 470.65).to_csv(spy_path, index=False)
     elif ch == 'wd':
         weekday(year=arg_1,option_type=arg_2)
+    elif ch == 'ftp':
+        get_sftp_cboe(arg_1,arg_2)
 
 
 

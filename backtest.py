@@ -77,7 +77,6 @@ def backtest():
     eod_idx = None
     for idx, q in gv.stock.iterrows():
         date = q['date']
-        open_instruction_1,open_instruction_2 = '',''
         q_open = q['open']
         if date < first_trade_day:
             continue
@@ -86,9 +85,9 @@ def backtest():
         y = date.year
         m = date.month
         d = date.day
-        if y == 2018:
-            if m == 5:
-                if d == 21:
+        if y == 2022:
+            if m == 1:
+                if d == 6:
                     print()
         print(date)
         volatility = q['volatility']
@@ -100,18 +99,20 @@ def backtest():
         # --------------------------------- CLOSE ----------------------------
         day_pl_1, day_pl_2 = 0,0
         day_active = False
+        open_instruction_1,open_instruction_2 = None, None
         if gv.param_1 and z1.open_date() > gv.epoc_start:
             day_active = True
-            close_routine(opts_1, date, z1, volatility, q_open)
+            close_routine(opts_1, date, z1, q_open)
             if z1.close_date() == date:
                 trade_pl_1 = z1.margin() - z1.close_commission
                 profit_sum += trade_pl_1
                 real_sum_1 += trade_pl_1
                 real_sum_and_curr_pl_1 = real_sum_1
                 cash += z1.current() * z1.side() - z1.close_commission
-                portfolio = cash + z2.value()   # that's right, z2, not z1
+                portfolio = cash + z2.value()   # !!! that's right, z2, not z1
                 trades += 1
-                open_instruction_1 = 'force_open'
+                if z1.comment[:3] == 'Exp':
+                    open_instruction_1 = 'weekday=%d' % date.isoweekday()
                 df = df.append(copy_z(date,z1), ignore_index=True)
             elif z1.is_open():
                 real_sum_and_curr_pl_1 = real_sum_1 + z1.value()
@@ -120,16 +121,17 @@ def backtest():
 
         if gv.param_2 and z2.open_date() > gv.epoc_start:
             day_active = True
-            close_routine(opts_2, date, z2, 0, q_open)
+            close_routine(opts_2, date, z2, q_open)
             if z2.close_date() == date:
                 trade_pl_2 = z2.margin() - z2.close_commission
                 profit_sum += trade_pl_2
                 real_sum_2 += trade_pl_2
                 real_sum_and_curr_pl_2 = real_sum_2
                 cash += z2.current() * z2.side() - z2.close_commission
-                portfolio = cash + z1.value()  # that's right, z1, not z2
+                portfolio = cash + z1.value()   # !!! that's right, z1, not z2
                 trades += 1
-                open_instruction_2 = 'force_open'
+                if z2.comment[:3] == 'Exp':
+                    open_instruction_2 = 'weekday=%d' % date.isoweekday()
                 df = df.append(copy_z(date,z2), ignore_index=True)
             elif z2.is_open():
                 real_sum_and_curr_pl_2 = real_sum_2 + z2.value()
@@ -143,8 +145,11 @@ def backtest():
         # --------------------------------- OPEN ----------------------------
         if date == last_trade_day:
             break
+        #                        ---- OPEN 1 ---
+        if z1.open_date() == gv.epoc_start:
+            open_instruction_1 = 'force_open'
         if gv.param_1 and z1.is_closed():
-            z = open_routine(gv.option_type_1, gv.side_1, True, opts_1,date, gv.algo_1, gv.days2exp_1,volatility,gv.param_1,open_instruction=open_instruction_1)
+            z = open_routine(gv.option_type_1, gv.side_1, True, opts_1,date, gv.algo_1, gv.days2exp_1,gv.param_1,open_instruction=open_instruction_1)
             if z is not None and z.open_date() == date:
                 if z.open_date() == z.expiration():
                     exit('laja')
@@ -152,6 +157,9 @@ def backtest():
                 cash -= z1.enter_price() * z1.side() + gv.comm
                 portfolio = cash + z1.value() + z2.value()
                 df = df.append(copy_z(date,z), ignore_index=True)
+#                        ---- OPEN 2 ---
+        if z2.open_date() == gv.epoc_start:
+            open_instruction_2 = 'force_open'
         if gv.param_2 and z2.is_closed():
             if gv.algo_2[:5] == 'hedge':
                 if z1 is not None:
@@ -165,7 +173,7 @@ def backtest():
                     param_2 = None
             else:
                 param_2 = gv.param_2
-            z = open_routine(gv.option_type_2, gv.side_2,False,opts_2,  date, gv.algo_2, gv.days2exp_2, volatility,param_2,open_instruction=open_instruction_2)
+            z = open_routine(gv.option_type_2, gv.side_2,False,opts_2,  date, gv.algo_2, gv.days2exp_2,param_2,open_instruction=open_instruction_2)
             if z is not None and z.open_date() == date:
                 if z.open_date() == z.expiration():
                     exit('laja')
@@ -184,8 +192,12 @@ def backtest():
     fn_base = '%s %s' % (sd_now,gv.suffix)
 
     df = df.reset_index(drop=True)
-    df = df[['date','stock','wd','open_date','expiration','strike','margin_1','margin_2','premium','current','real_sum_1','real_sum_2','unreal_sum_1','unreal_sum_2','profit_sum','portfolio','details','right_strike','action','eod_mark']]
-    if not gv.ini('record_non_trade_days'):
+    if gv.param_2 is not None:
+        df = df[['date','stock','wd','open_date','expiration','strike','margin_1','margin_2','premium','current','real_sum_1','real_sum_2','unreal_sum_1','unreal_sum_2','profit_sum','portfolio','details','action','eod_mark']]
+    else:
+        df = df[['date','stock','wd','open_date','expiration','strike','margin_1','premium','current','real_sum_1','unreal_sum_1','profit_sum','portfolio','details','action','eod_mark']]
+
+    if not gv.record_non_trade_days:
         df = df.loc[(df['action'] != 'v1') & (df['action'] != 'v2')]
     save_csv(df,'../out/e-%s.csv' % fn_base)
     copyfile('config.ini','../out/i-%s.ini' % fn_base)
@@ -244,7 +256,10 @@ def run(task=''):
             process_data('h')
             process_data('wd','2022','P')
             process_data('wd','2022','C')
+    elif task == 'ftp':
+        process_data('ftp')
 
 if __name__ == '__main__':
-    a = gv.ini('task','')
-    run(a)
+
+    gv.task = gv.ini('task','')
+    run(gv.task)

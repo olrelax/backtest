@@ -158,10 +158,17 @@ def last_month_day(current_date):
 def add_days(dt, n):
     return dt + relativedelta(days=n)
 
-def add_work_days(dt, n):
 
-    dst = dt + relativedelta(days=n)
-    return dst + relativedelta(days=2) if dst.isoweekday() == 6 else dst + relativedelta(days=1) if dst.isoweekday() == 7 else dst
+def add_work_days(from_date, n):
+    business_days_to_add = n
+    current_date = from_date
+    while business_days_to_add > 0:
+        current_date += timedelta(days=1)
+        weekday = current_date.weekday()
+        if weekday >= 5:  # sunday = 6
+            continue
+        business_days_to_add -= 1
+    return current_date
 
 
 def add_weeks(dt,n):

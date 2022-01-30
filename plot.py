@@ -3,16 +3,15 @@ import matplotlib.pyplot as plt
 import globalvars as gv
 def plot(src,txt=''):
     show = gv.show
+    plot_csv_src = gv.ini('plot_src')
+    if gv.task == 'p' and plot_csv_src is not None and len(plot_csv_src) > 0:
+        src = plot_csv_src[2:]
     if src == 'last':
         last_file = open('../out/last_file','r')
         fn = last_file.read().rstrip('\n')
         path = '../out/e-%s.csv' % fn
         save = False
         show = True
-    elif src == 'plot_csv':
-        save = False
-        show = True
-        path = '../out/%s.csv' % gv.ini('plot_csv')
     else:
         path = '../out/e-%s.csv' % src
         save = True
@@ -22,11 +21,19 @@ def plot(src,txt=''):
 
     if gv.ini('plot_all'):
         numeric_cols = ['stock', 'real_sum_1', 'real_sum_2', 'unreal_sum_1', 'unreal_sum_2', 'portfolio', 'profit_sum']
-    elif not gv.ini('plot_non_trade_days'):
+    elif not gv.plot_non_trade_days:
+
         df = df.loc[(df['action'] != 'v1') & (df['action'] != 'v2')]
-        numeric_cols = ['stock', 'real_sum_1', 'real_sum_2', 'profit_sum']
+        if gv.param_2 is not None:
+            numeric_cols = ['stock', 'real_sum_1', 'real_sum_2', 'profit_sum']
+        else:
+            numeric_cols = ['stock', 'real_sum_1', 'profit_sum']
     else:
-        numeric_cols = ['stock','unreal_sum_1','unreal_sum_2','portfolio']
+        if gv.param_2 is not None:
+            numeric_cols = ['stock','unreal_sum_1','unreal_sum_2','portfolio']
+        else:
+            numeric_cols = ['stock','unreal_sum_1','portfolio']
+
 
     df_date = df[['date']]
     show_stock = gv.ini('show_stock')
@@ -40,7 +47,7 @@ def plot(src,txt=''):
     df = df_date.join(df_numeric)
     df = df.set_index('date')
     df.to_csv('../out/last_plot.csv')
-    ax = df.plot(figsize=(14, 8), subplots=False,title=txt)
+    ax = df.plot(figsize=(12, 7), subplots=False,title=txt)
     xtick = pd.date_range(start=df.index.min(), end=df.index.max(), freq='W')
     ax.set_xticks(xtick, minor=True)
     ax.grid('on', which='minor')

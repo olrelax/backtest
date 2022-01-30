@@ -5,7 +5,10 @@ from configparser import ConfigParser, NoOptionError
 # real_sum_2 = 0.0
 # real_sum_and_curr_pl_1 = 0.0
 # real_sum_and_curr_pl_2 = 0.0
+from datetime import datetime
 show = False
+plot_non_trade_days = True
+record_non_trade_days = True
 param_1 = None
 param_2 = None
 vlt_close = -10
@@ -18,11 +21,12 @@ sample_len = 0
 comm = 0.021
 bd = ''
 ed = ''
+task = ''
 exclude_period = ''
 exclude_bound = ''
 suffix = ''
-trade_day_of_week_1 = None
-trade_day_of_week_2 = None
+weekday_1 = None
+weekday_2 = None
 opts_annual_C, opts_annual_next_year_C = None, None
 opts_annual_P, opts_annual_next_year_P = None, None
 algo_1 = ''
@@ -41,6 +45,15 @@ option_type_1, option_type_2 = '',''
 side_1, side_2 = '',''
 current_month = 0
 epoc_start = None
+skip_dates_list = None
+def gv_s2d(text,fmt='%Y-%m-%d'):
+    try:
+        s = datetime.strptime(text,fmt)
+    except Exception as e:
+        prn('s2d error:','red')
+        s = '{}'.format(e)
+        exit(s)
+    return s
 def reset_test():
     global current_month,opts_annual_C, opts_annual_next_year_C,opts_annual_P, opts_annual_next_year_P
     current_month = 0
@@ -131,10 +144,10 @@ def trade_scheme(ini_str):
 
 def read_ini():
     global comm, show, vlt_close, vlt_open, days2exp_1,days2exp_2, \
-        param_1, param_2, bd,ed,exclude_period,trade_day_of_week_1,trade_day_of_week_2,  \
+        param_1, param_2, bd,ed,exclude_period,weekday_1,weekday_2,  \
         algo_1, algo_2,stop_loss,forced_exit_date,intraday_tested,\
         strike_loss_limit,get_atm,cheap_limit,take_profit,abs_not_percent,atm_open_limit,atm_close_limit, \
-        option_type_1, option_type_2,side_1,side_2
+        option_type_1, option_type_2,side_1,side_2,skip_dates_list,plot_non_trade_days,record_non_trade_days
     abs_not_percent = ini('abs_not_percent')
     comm = ini('comm')
     show = ini('show')
@@ -149,8 +162,8 @@ def read_ini():
     exclude_period = ini('exclude_period')
     trade_scheme_1 = ini('trade_scheme_1')
     trade_scheme_2 = ini('trade_scheme_2')
-    trade_day_of_week_1,days2exp_1 = trade_scheme(trade_scheme_1)
-    trade_day_of_week_2,days2exp_2 = trade_scheme(trade_scheme_2)
+    weekday_1,days2exp_1 = trade_scheme(trade_scheme_1)
+    weekday_2,days2exp_2 = trade_scheme(trade_scheme_2)
     intraday_tested = ini('intraday_tested')
     algo_1 = ini('algo_1')
     algo_2 = ini('algo_2')
@@ -167,6 +180,10 @@ def read_ini():
     option_type_2 = ini('option_type_2')
     side_1 = ini('side_1')
     side_2 = ini('side_2')
-    if algo_2[:5] == 'hedge':
-        if not trade_day_of_week_1 == trade_day_of_week_2 or not days2exp_1 == days2exp_2:
-            exit('trading scheme must be equal for hedging')
+#    if algo_2[:5] == 'hedge':
+#        if not weekday_1 == weekday_2 or not days2exp_1 == days2exp_2:
+#            exit('trading scheme must be equal for hedging')
+    skip_dates = ini('skip_dates')
+    skip_dates_list = list(map(gv_s2d,skip_dates.split(',')))
+    plot_non_trade_days = ini('plot_non_trade_days')
+    record_non_trade_days = ini('record_non_trade_days') or plot_non_trade_days
