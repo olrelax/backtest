@@ -1,16 +1,7 @@
 import pandas as pd
-import numpy as np
-from datetime import datetime,timedelta
-import au
-from au import s2d,fl,d2s,add_days, add_work_days
-from inspect import currentframe, getframeinfo
+from au import s2d
 import matplotlib.pyplot as plt
-from os import system
-from position import Position
 from datetime import datetime
-import time
-import sqlitetocsv as sql
-import globalvars as gv
 
 from inspect import currentframe, getframeinfo
 from au import fl
@@ -67,8 +58,6 @@ def backtest():
     txt = 'discS=%d, discL=%d, wd=%d' % (discount_s,discount_l,wd)
     plot(hedged_plot,txt)
 
-def learn():
-    backtest()
 
 if __name__ == '__main__':
-    learn()
+    backtest()

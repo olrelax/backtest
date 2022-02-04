@@ -1,8 +1,8 @@
 import pandas as pd
 from os import walk
 from dateutil.relativedelta import *
-from datetime import datetime,timedelta
-from au import s2d, d2s,prn,add_days
+from datetime import datetime
+from au import s2d, d2s,prn,add_days,read_opt
 from os import system
 import time
 import urllib.request
@@ -260,15 +260,8 @@ def intraday(date,bottom=None,top=None):
         df = df.loc[df['option_type'] == 'P'].loc[df['expiration'] == date]
     df.to_csv('%s/%s.csv' % (path,date),index=False)
     print(df.info())
-
-def weekday(year,option_type):
-    fn = '../data/SPY_CBOE_%s_%s.csv' % (year,option_type)
-    df = pd.read_csv('../data/%s' % fn)
-    df['quote_date'] = pd.to_datetime(df['quote_date'])
-    df['expiration'] = pd.to_datetime(df['expiration'])
-    df['weekday'] = pd.Series(map(lambda x:x.isoweekday(), df['quote_date']))
-    df['exp_weekday'] = pd.Series(map(lambda x:x.isoweekday(), df['expiration']))
-    df.to_csv('../data/%s' % fn, index=False)
+def td(d):
+    return d.days
 
 def get_sftp_cboe(month=None,day=None):
     if month is None or day is None:
@@ -294,6 +287,31 @@ def get_sftp_cboe(month=None,day=None):
     print('ls:')
     system('ls %s | grep %s' % (d,filename[:-4]))
     print('done')
+def weekday(year,option_type):
+    fn = '../data/SPY_CBOE_%s_%s.csv' % (year,option_type)
+    df = pd.read_csv('../data/%s' % fn)
+    df['quote_date'] = pd.to_datetime(df['quote_date'])
+    df['expiration'] = pd.to_datetime(df['expiration'])
+    df['weekday'] = pd.Series(map(lambda x:x.isoweekday(), df['quote_date']))
+    df['exp_weekday'] = pd.Series(map(lambda x:x.isoweekday(), df['expiration']))
+    df['days_to_exp'] = pd.Series(map(td,(df['expiration']-df['quote_date'])))
+    df.to_csv('%s' % fn, index=False)
+def make_weekly(y,t):
+    o = read_opt(y,datetime.now(),t)
+    o_week = o.loc[(o['days_to_exp'] == 7) | (o['days_to_exp'] == 0)]
+    o_week.to_csv('../data/SPY_CBOE_%d_%s_WEEK.csv' % (y,t),index=False)
+def cat_weekly():
+    df18 = pd.read_csv('../data/SPY_CBOE_2018_P_WEEK.csv')
+    df19 = pd.read_csv('../data/SPY_CBOE_2019_P_WEEK.csv')
+    df20 = pd.read_csv('../data/SPY_CBOE_2020_P_WEEK.csv')
+    df21 = pd.read_csv('../data/SPY_CBOE_2021_P_WEEK.csv')
+    df22 = pd.read_csv('../data/SPY_CBOE_2022_P_WEEK.csv')
+    df_week = df18.append(df19,ignore_index=True)
+    df_week = df_week.append(df20,ignore_index=True)
+    df_week = df_week.append(df21,ignore_index=True)
+    df_week = df_week.append(df22,ignore_index=True)
+    df_week.to_csv('../data/week.csv',index=False)
+
 def process_data(ch,arg_1=None,arg_2=None):
     spy_path = '../data/spy.csv'
     if ch == 'h':
@@ -320,11 +338,9 @@ def process_data(ch,arg_1=None,arg_2=None):
         weekday(year=arg_1,option_type=arg_2)
     elif ch == 'ftp':
         get_sftp_cboe(arg_1,arg_2)
-
-
-
-
 # Adding subscription:
 # copy new files to main SPY_20YY_CBOE_SRC folder. Do 'd' (yahoo), {'r','<year>','<type>'} (process opt), 'h' (history with opt)
+def select_task():
+    cat_weekly()
 if __name__ == '__main__':
-    process_data('wd','2022','C')
+    select_task()

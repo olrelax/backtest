@@ -3,12 +3,12 @@ from datetime import datetime
 from au import prn, s2d, d2s, add_work_days,read_stock,get_monthly_opts,get_latest_trade_day,save_csv
 from os import system
 import globalvars as gv
-from position import Position,listz
-from transactions import close_routine, open_routine,option_value
+from position import Position
+from transactions import close_routine, open_routine
 from plot import plot
 from shutil import copyfile
 from learning import learn
-from prepare_data import process_data
+from prepare_data import select_task
 def archive():
     arc_filename = 'options-' + datetime.now().strftime('%Y-%m-%d--%H-%M')
     cmd = 'tar cvf ../Archive/%s.tar *.py config.ini  2>/dev/null' % arc_filename
@@ -90,7 +90,6 @@ def backtest():
                 if d == 6:
                     print()
         print(date)
-        volatility = q['volatility']
         opts_1 = get_monthly_opts(date,opts_1,gv.option_type_1)
         if gv.option_type_2 == gv.option_type_1:
             opts_2 = opts_1
@@ -243,21 +242,8 @@ def run(task=''):
         iterate_bt(test=True)
     elif task == 'learn':
         learn()
-    elif task[:4] == 'data':
-        task_set = task.split(',')
-        if len(task_set) == 2:
-            process_data(task_set[1])
-        elif len(task_set) == 4:
-            process_data(task_set[1],task_set[2],task_set[3])
-        elif task == 'data':
-            process_data('d')
-            process_data('r','2022','P')
-            process_data('r','2022','C')
-            process_data('h')
-            process_data('wd','2022','P')
-            process_data('wd','2022','C')
-    elif task == 'ftp':
-        process_data('ftp')
+    elif task == 'data':
+        select_task()
 
 if __name__ == '__main__':
 

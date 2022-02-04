@@ -9,6 +9,9 @@ from inspect import currentframe, getframeinfo
 fl(getframeinfo(currentframe()))
 from au import fl
 """
+def days_from_to(d0,d1):
+    delta = d1 - d0
+    return delta.days
 def get_latest_trade_day(date):
     if date is None:
         return gv.stock['date'].iloc[-1]
