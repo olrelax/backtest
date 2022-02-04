@@ -42,7 +42,8 @@ def backtest():
     discount_s = 15
     discount_l = 20
     wd = 1
-    bd = s2d('2020-01-01')
+    start_date = '2020-01-01'
+    bd = datetime.strptime(start_date,'%Y-%m-%d')
     fl(getframeinfo(currentframe()))
     fn = '../data/week.csv'
     df = pd.read_csv(fn, index_col=0)
@@ -57,6 +58,7 @@ def backtest():
     hedged_plot['sum'] = hedged_plot['sum_s'] + hedged_plot['sum_l']
     txt = 'discS=%d, discL=%d, wd=%d' % (discount_s,discount_l,wd)
     plot(hedged_plot,txt)
+
 
 
 if __name__ == '__main__':
