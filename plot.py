@@ -47,7 +47,7 @@ def plot(src,txt=''):
     df = df_date.join(df_numeric)
     df = df.set_index('date')
     df.to_csv('../out/last_plot.csv')
-    ax = df.plot(figsize=(12, 7), subplots=False,title=txt)
+    ax = df.plot(figsize=(11, 7), subplots=False,title=txt)
     xtick = pd.date_range(start=df.index.min(), end=df.index.max(), freq='W')
     ax.set_xticks(xtick, minor=True)
     ax.grid('on', which='minor')
