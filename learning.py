@@ -8,7 +8,12 @@ def merge():
     df = df_exp.merge(df,left_on='e',right_on='d')
     print(df)
 
+def dic():
+    d = {'type': ['C','C','C'], 'side': ['S', 'S', 'L']}
+    for i in d:
+        print(i)
+
 def learn():
     merge()
 if __name__ == '__main__':
-    learn()
+    dic()
