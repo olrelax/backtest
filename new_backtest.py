@@ -6,7 +6,7 @@ import inspect
 draw_or_show = 'show'
 start_date = '2020-01-01'
 type1,type2,side1,side2 = 'C','P',1,1
-bid_1_in_lim = 100
+premium_limit = 100
 fn = ''
 def plot(df):
     plt.figure(figsize=(11, 7))
@@ -62,7 +62,7 @@ def get_df(disc,side,opt_type):
 def backtest(discount_1,discount_2):
     df = get_df(discount_1,side1,type1)
     df = df.rename(columns={'underlying_bid_1545_x':'under_1_in','bid_1545_x':'bid_1_in','ask_1545_x':'ask_1_in','underlying_bid_1545_y':'under_1_out','bid_1545_y':'bid_1_out','ask_1545_y':'ask_1_out','profit':'profit_1'})
-    df = df.loc[df['bid_1_in'] < bid_1_in_lim]
+    df = df.loc[df['bid_1_in'] < premium_limit]
     df['sum_1'] = df['profit_1'].cumsum(axis=0)
     if type2 not in ('P','C'):
         return df
@@ -75,13 +75,13 @@ def backtest(discount_1,discount_2):
 
 
 def do_backtests():
-    global draw_or_show, start_date, type1, type2, side1, side2, bid_1_in_lim,fn
+    global draw_or_show, start_date, type1, type2, side1, side2, premium_limit,fn
     type1 = 'C'
     type2 = 'C'
     side1 = 'L'
     side2 = 'S'
     a = 'start 3 5'
-    bid_1_in_lim = 5
+    premium_limit = 5
     start_date = '2018-01-01'
     draw_or_show = 'show'
 
@@ -103,7 +103,7 @@ def do_backtests():
 #            df['sum_2'] = df['profit_2'].cumsum(axis=0)
 #            df['sum'] = df['sum_1'] + df['sum_2']
         fn = datetime.strftime(datetime.now(), '%d-%-H-%M-%S')
-        ini_str = 'type%s side%s disc%d, type%s side%s param%d, lim %d' % (type1,side1,disc_s,type2,side2,disc_l,bid_1_in_lim)
+        ini_str = 'type%s side%s disc%d, type%s side%s param%d, lim %d' % (type1,side1,disc_s,type2,side2,disc_l,premium_limit)
         ini = open('../out/%s.ini' % fn,'w')
         print(ini_str,file=ini)
         ini.close()
