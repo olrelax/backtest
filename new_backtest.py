@@ -8,17 +8,38 @@ start_date = '2020-01-01'
 type1,type2,side1,side2 = 'C','P',1,1
 premium_limit = 100
 fn = ''
+plot_under = True
 def plot(df):
+    do_2 = type2 in ('P', 'C')
+    if plot_under:
+        opt_min = df[['sum_1','sum_2','sum']].to_numpy().min() if do_2 else df['sum_1'].min()
+        opt_max = df[['sum_1','sum_2','sum']].to_numpy().max() if do_2 else df['sum_1'].max()
+        under_min = df['under_1_out'].to_numpy().min()
+        under_max = df['under_1_out'].to_numpy().max()
+        df['under_1_out'] = df['under_1_out'] * (opt_max-opt_min)/(under_max - under_min)
+        under_min = df['under_1_out'].to_numpy().min()
+        df['under_1_out'] = df['under_1_out'] - under_min + opt_min
     plt.figure(figsize=(11, 7))
-    if type2 in ('P','C'):
-        plt.plot(df['expiration'],df[['sum_1','sum_2','sum']],label=['sum_1','sum_2','sum'])
-        plt.legend(loc="lower left")
+    if do_2:
+        if plot_under:
+            plt.plot(df['expiration'],df[['under_1_out','sum_1','sum_2','sum']],label=['under','sum_1','sum_2','sum'])
+        else:
+            plt.plot(df['expiration'],df[['sum_1','sum_2','sum']],label=['sum_1','sum_2','sum'])
     else:
-        plt.plot(df['expiration'],df['sum_1'])
+        if plot_under:
+            plt.plot(df['expiration'],df[['under_1_out','sum_1']],label=['under','sum_1'])
+        else:
+            plt.plot(df['expiration'],df['sum_1'],label=['sum_1'])
+    plt.legend(loc='best')
+
+
+#    df_num = df.drop(columns=['expiration'])
+#    df_num = (df_num - df_num.mean()) / df_num.std()
+
     plt.xticks(rotation=30)
     plt.grid('on', which='minor')
     plt.grid('on', which='major')
-    plt.savefig('../out/%s.png' % fn)
+    plt.savefig('../out/c-%s.png' % fn)
     if draw_or_show == 'draw':
         plt.draw()
     else:
@@ -75,16 +96,16 @@ def backtest(discount_1,discount_2):
 
 
 def do_backtests():
-    global draw_or_show, start_date, type1, type2, side1, side2, premium_limit,fn
+    global draw_or_show, start_date, type1, type2, side1, side2, premium_limit,fn,plot_under
     type1 = 'C'
     type2 = 'C'
     side1 = 'L'
     side2 = 'S'
-    a = 'start 3 5'
+    a = 'start 3 9'
     premium_limit = 5
     start_date = '2018-01-01'
     draw_or_show = 'show'
-
+    plot_under = True
     while True:
         if a[:5] == 'start':
             a = a[6:]
@@ -97,18 +118,13 @@ def do_backtests():
             disc_s = int(p[0])
             disc_l = int(p[1]) if len(p) > 1 else 0
         df = backtest(disc_s, disc_l)
-
-#        df['sum_1'] = df['profit_1'].cumsum(axis=0)
-#        if type2 in ('P', 'C'):
-#            df['sum_2'] = df['profit_2'].cumsum(axis=0)
-#            df['sum'] = df['sum_1'] + df['sum_2']
         fn = datetime.strftime(datetime.now(), '%d-%-H-%M-%S')
         ini_str = 'type%s side%s disc%d, type%s side%s param%d, lim %d' % (type1,side1,disc_s,type2,side2,disc_l,premium_limit)
-        ini = open('../out/%s.ini' % fn,'w')
+        ini = open('../out/i-%s.txt' % fn,'w')
         print(ini_str,file=ini)
         ini.close()
         # noinspection PyTypeChecker
-        df.to_csv('../out/%s.csv' % fn, index=False)
+        df.to_csv('../out/e-%s.csv' % fn, index=False)
         plot(df)
         if not draw_or_show == 'draw':
             break
