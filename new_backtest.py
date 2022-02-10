@@ -60,22 +60,24 @@ def get_df(disc,side,opt_type):
     return o
 
 def backtest(discount_1,discount_2):
-    df1 = get_df(discount_1,side1,type1)
-    df1 = df1.rename(columns={'underlying_bid_1545_x':'under_1_in','bid_1545_x':'bid_1_in','ask_1545_x':'ask_1_in','underlying_bid_1545_y':'under_1_out','bid_1545_y':'bid_1_out','ask_1545_y':'ask_1_out','profit':'profit_1'})
-    df1 = df1.loc[df1['bid_1_in'] < bid_1_in_lim]
-    if type2 in ('P','C'):
-        df2 = get_df(discount_2,side2,type2)
-        df2 = df2.rename(columns={'underlying_bid_1545_x':'under_2_in','bid_1545_x':'bid_2_in','ask_1545_x':'ask_2_in','underlying_bid_1545_y':'under_2_out','bid_1545_y':'bid_2_out','ask_1545_y':'ask_2_out','profit':'profit_2'})
-        df = pd.merge(df1,df2,on='expiration')
-    else:
-        df = df1
+    df = get_df(discount_1,side1,type1)
+    df = df.rename(columns={'underlying_bid_1545_x':'under_1_in','bid_1545_x':'bid_1_in','ask_1545_x':'ask_1_in','underlying_bid_1545_y':'under_1_out','bid_1545_y':'bid_1_out','ask_1545_y':'ask_1_out','profit':'profit_1'})
+    df = df.loc[df['bid_1_in'] < bid_1_in_lim]
+    df['sum_1'] = df['profit_1'].cumsum(axis=0)
+    if type2 not in ('P','C'):
+        return df
+    df2 = get_df(discount_2,side2,type2)
+    df2 = df2.rename(columns={'underlying_bid_1545_x':'under_2_in','bid_1545_x':'bid_2_in','ask_1545_x':'ask_2_in','underlying_bid_1545_y':'under_2_out','bid_1545_y':'bid_2_out','ask_1545_y':'ask_2_out','profit':'profit_2'})
+    df = pd.merge(df,df2,on='expiration')
+    df['sum_2'] = df['profit_2'].cumsum(axis=0)
+    df['sum'] = df['sum_1'] + df['sum_2']
     return df
 
 
 def do_backtests():
     global draw_or_show, start_date, type1, type2, side1, side2, bid_1_in_lim,fn
     type1 = 'C'
-    type2 = ''
+    type2 = 'C'
     side1 = 'L'
     side2 = 'S'
     a = 'start 3 5'
@@ -96,13 +98,10 @@ def do_backtests():
             disc_l = int(p[1]) if len(p) > 1 else 0
         df = backtest(disc_s, disc_l)
 
-        df['sum_1'] = df['profit_1'].cumsum(axis=0)
-        if type2 in ('P', 'C'):
-            df['sum_2'] = df['profit_2'].cumsum(axis=0)
-            df['sum'] = df['sum_1'] + df['sum_2']
-            df_plot = df[['expiration', 'sum_1', 'sum_2', 'sum']]
-        else:
-            df_plot = df
+#        df['sum_1'] = df['profit_1'].cumsum(axis=0)
+#        if type2 in ('P', 'C'):
+#            df['sum_2'] = df['profit_2'].cumsum(axis=0)
+#            df['sum'] = df['sum_1'] + df['sum_2']
         fn = datetime.strftime(datetime.now(), '%d-%-H-%M-%S')
         ini_str = 'type%s side%s disc%d, type%s side%s param%d, lim %d' % (type1,side1,disc_s,type2,side2,disc_l,bid_1_in_lim)
         ini = open('../out/%s.ini' % fn,'w')
@@ -110,7 +109,7 @@ def do_backtests():
         ini.close()
         # noinspection PyTypeChecker
         df.to_csv('../out/%s.csv' % fn, index=False)
-        plot(df_plot)
+        plot(df)
         if not draw_or_show == 'draw':
             break
 
