@@ -11,6 +11,7 @@ from io import StringIO
 import ssl
 import paramiko
 import zipfile
+import inspect
 
 
 
@@ -301,49 +302,28 @@ def add_weekday(y):
         y = 2022
     add_weekday_do(y,'P')
     add_weekday_do(y, 'C')
-def save(dtf,name):
-    dtf.to_csv('../out/%s.csv' % name,index = False )
+
+
+def get_name(var):
+    callers_local_vars = inspect.currentframe().f_back.f_back.f_locals.items()
+    return [var_name for var_name, var_val in callers_local_vars if var_val is var]
+
+
+def save(dtf,arg_name=None):
+    name = get_name(dtf)[0] if arg_name is None else arg_name
+    dtf.to_csv('../out/%s.csv' % name,index=False)
 
 def loc_weekly_exp_spy_cboe(y,t):
     o = read_opt(y,datetime.now(),t)
     o['quote_date'] = pd.to_datetime(o['quote_date'])
     o['expiration'] = pd.to_datetime(o['expiration'])
-    o = o.loc[(o['days_to_exp'] < 9) & (o['days_to_exp'] > 5)].drop_duplicates(subset=['quote_date','expiration'])
-    oc = o[['quote_date','expiration','strike','weekday','exp_weekday','days_to_exp']]
-    save(oc,'oc')
-    save(oc.loc[(oc['weekday'] < 3) & (oc['exp_weekday'] < 3)].drop_duplicates(subset='expiration'),'oc1,2')
-    o_week = o.loc[(o['days_to_exp'] == 7) | (o['days_to_exp'] == 6) | (o['days_to_exp'] == 8) | (o['days_to_exp'] == 0)]
-    o_1_2_8 = o_week.loc[(o_week['weekday'] == 1) & (o_week['exp_weekday'] == 2)].copy()
-    o_2_1_raw = o_week.loc[(o_week['weekday'] == 2)].copy()
-    o_2_1_raw['qd_exp'] = o_2_1_raw['quote_date']
-    o_1_2_8['qd_exp'] = o_1_2_8['expiration']
-    o_2_1_6 = pd.merge(o_1_2_8['qd_exp'],o_2_1_raw,on='qd_exp')
-    o_2_1_6.sort_values(['quote_date','expiration']).to_csv('../out/o_2m.csv')
-    o_2_1 = o_2_1_6.append(o_1_2_8,ignore_index=True).sort_values(['quote_date','expiration'])
-    # o_2_1.drop_duplicates(subset='quote_date').drop_duplicates(subset='expiration').to_csv('../out/o_2_1.csv')
-    o_2_1.drop_duplicates(subset='expiration').to_csv('../out/o_2_1.csv')
-    exit()
-    o_deb = o_week[['quote_date','strike','expiration','weekday','exp_weekday','days_to_exp']]
-    o_deb.drop_duplicates(subset='expiration').to_csv('../data/o_deb.csv',index=False)
-    o_week.to_csv('../data/SPY_CBOE_%d_%s_WEEK.csv' % (y,t),index=False)
-    o_deb = o_deb.drop_duplicates(subset=['quote_date','expiration'])
-    o_deb_in = o_deb.loc[o_deb['days_to_exp'] > 0]
-    o_deb_in_drop_exp = o_deb_in.drop_duplicates(subset='expiration').sort_values(['quote_date','expiration'])
-    o_deb_in.to_csv('../data/o_deb_in_%d_%s_WEEK.csv' % (y, t), index=False)
-    o_deb_in_drop_exp.to_csv('../data/o_deb_in_drop_exp_%d_%s_WEEK.csv' % (y, t), index=False)
+    d = o[['quote_date','expiration','strike','underlying_bid_1545','bid_1545','ask_1545','weekday','exp_weekday','days_to_exp']]
+    qd8 = d.loc[(d['days_to_exp'] == 0) | (d['days_to_exp'] == 6) | (d['days_to_exp'] == 7) | (d['days_to_exp'] == 8)]
+    d_exp = qd8[['expiration']].drop_duplicates(subset=['expiration'])
+    dm = d_exp.merge(qd8,left_on='expiration',right_on='quote_date').drop(columns='expiration_x').rename(columns={'expiration_y':'expiration'})
+    save(dm)
+    return dm
 
-
-def make_single_weekly_file(t):
-    df18 = pd.read_csv('../data/SPY_CBOE_2018_%s_WEEK.csv' % t)
-    df19 = pd.read_csv('../data/SPY_CBOE_2019_%s_WEEK.csv' % t)
-    df20 = pd.read_csv('../data/SPY_CBOE_2020_%s_WEEK.csv' % t)
-    df21 = pd.read_csv('../data/SPY_CBOE_2021_%s_WEEK.csv' % t)
-    df22 = pd.read_csv('../data/SPY_CBOE_2022_%s_WEEK.csv' % t)
-    df_week = df18.append(df19,ignore_index=True)
-    df_week = df_week.append(df20,ignore_index=True)
-    df_week = df_week.append(df21,ignore_index=True)
-    df_week = df_week.append(df22,ignore_index=True)
-    df_week.to_csv('../data/weekly_%s.csv' % t,index=False)
 
 def process_data(ch,arg_1=None,arg_2=None):
     spy_path = '../data/spy.csv'
@@ -367,21 +347,20 @@ def process_data(ch,arg_1=None,arg_2=None):
         add_weekday(y=arg_1)
     elif ch == 'ftp':
         get_sftp_cboe(arg_1,arg_2)
-    elif ch == 'mwf':
-        make_single_weekly_file('P')
-        make_single_weekly_file('C')
+
     elif ch == 'lwe':
-        loc_weekly_exp_spy_cboe(2018,'P')
-        exit()
-        loc_weekly_exp_spy_cboe(2019,'P')
-        loc_weekly_exp_spy_cboe(2020,'P')
-        loc_weekly_exp_spy_cboe(2021,'P')
-        loc_weekly_exp_spy_cboe(2022,'P')
-        loc_weekly_exp_spy_cboe(2018,'C')
-        loc_weekly_exp_spy_cboe(2019,'C')
-        loc_weekly_exp_spy_cboe(2020,'C')
-        loc_weekly_exp_spy_cboe(2021,'C')
-        loc_weekly_exp_spy_cboe(2022,'C')
+        w = loc_weekly_exp_spy_cboe(2018,'P')
+        w = w.append(loc_weekly_exp_spy_cboe(2019,'P'),ignore_index=True)
+        w = w.append(loc_weekly_exp_spy_cboe(2020,'P'),ignore_index=True)
+        w = w.append(loc_weekly_exp_spy_cboe(2021,'P'),ignore_index=True)
+        weekly_p = w.append(loc_weekly_exp_spy_cboe(2022,'P'),ignore_index=True)
+        weekly_p.to_csv('../data/weekly_P.csv',index=False)
+        w = loc_weekly_exp_spy_cboe(2018,'C')
+        w = w.append(loc_weekly_exp_spy_cboe(2019,'C'),ignore_index=True)
+        w = w.append(loc_weekly_exp_spy_cboe(2020,'C'),ignore_index=True)
+        w = w.append(loc_weekly_exp_spy_cboe(2021,'C'),ignore_index=True)
+        weekly_c = w.append(loc_weekly_exp_spy_cboe(2022,'C'),ignore_index=True)
+        weekly_c.to_csv('../data/weekly_C.csv',index=False)
 
 
 def select_task():

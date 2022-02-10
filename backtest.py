@@ -187,7 +187,7 @@ def backtest():
     prn('End', 'yellow')
     d_now = datetime.now()
     sd_now = datetime.strftime(d_now, '%dd%Hh%Mm%Ss')
-    gv.suffix = ' sp %.2f, lp %.2f' % (gv.param_1, gv.param_2 if gv.param_2 is not None else 0)
+    gv.suffix = ' sp %.2f, lp %.2f' % (gv.param_1 if gv.param_1 is not None else 0, gv.param_2 if gv.param_2 is not None else 0)
     fn_base = '%s %s' % (sd_now,gv.suffix)
 
     df = df.reset_index(drop=True)

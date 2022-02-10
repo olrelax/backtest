@@ -1,30 +1,14 @@
-import tkinter as tk
-from tkinter import *
-from tkinter import ttk
+import pandas as pd
+def merge():
+    df = pd.DataFrame({'d': ['m24','m24','m1','m1','t2','t2','m8','m8','t9','t9'],
+                       'e': ['m1','m1','t9','t9','t9','t9','m15','m15','m15','m15'],
+                       's':[100,101,111,112,111,112,131,132,131,132]})
+    df_exp = df[['e']].drop_duplicates(subset='e')
+    print(df_exp)
+    df = df_exp.merge(df,left_on='e',right_on='d')
+    print(df)
 
-class karl(Frame):
-    def __init__(self):
-        tk.Frame.__init__(self)
-        self.pack()
-        self.master.title("Karlos")
-        self.button1 = Button(self, text="CLICK HERE", width=25,
-                              command=self.new_window)
-        self.button1.grid(row=0, column=1, columnspan=2, sticky=W+E+N+S)
-
-    def new_window(self):
-        self.newWindow = karl2()
-
-class karl2(Frame):
-    def __init__(self):
-        tk.Frame.__init__(self)
-        new = Toplevel(self)
-        new.title("karlos More Window")
-        new.button = tk.Button(text="PRESS TO CLOSE", width=25,
-                               command=self.close_window)
-        new.button.pack()
-    def close_window(self):
-        self.destroy()
 def learn():
-    karl().mainloop()
+    merge()
 if __name__ == '__main__':
     learn()
