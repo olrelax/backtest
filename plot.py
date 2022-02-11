@@ -1,3 +1,4 @@
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import globalvars as gv
@@ -33,8 +34,6 @@ def plot(src,txt=''):
             numeric_cols = ['stock','unreal_sum_1','unreal_sum_2','portfolio']
         else:
             numeric_cols = ['stock','unreal_sum_1','portfolio']
-
-
     df_date = df[['date']]
     show_stock = gv.ini('show_stock')
     df_numeric = df[numeric_cols]  # .drop(columns='action')
@@ -65,4 +64,3 @@ def plot(src,txt=''):
         plt.savefig(full_fn_path)
     if show:
         plt.show()
-

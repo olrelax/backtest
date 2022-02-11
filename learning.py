@@ -10,8 +10,11 @@ def merge():
 
 def dic():
     d = {'type': ['C','C','C'], 'side': ['S', 'S', 'L']}
-    for i in d:
-        print(i)
+    print(type(d))
+    a = [1,2]
+    print(type(a))
+    b = (1,2)
+    print(type(b))
 
 def learn():
     merge()
