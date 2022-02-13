@@ -64,10 +64,10 @@ def select_opt(df_a, quote_date,exp_value,exp_mode,weekday,search_value,value_mo
     if value_mode == 'exact_strike':
         df = df_exp.loc[df_exp['strike'] == search_value]
     elif value_mode == 'distance':
-        if gv.abs_not_percent:
-            strike_estimate = stock + sign * search_value
-        else:
-            strike_estimate = stock * (1 + sign * search_value / 100)
+        strike_estimate = stock + sign * search_value
+        df = df_exp.iloc[(df_exp['strike'] - strike_estimate).abs().argsort()][0:1]
+    elif value_mode == 'discount':
+        strike_estimate = stock * (100 + sign * search_value / 100)
         df = df_exp.iloc[(df_exp['strike'] - strike_estimate).abs().argsort()][0:1]
     elif value_mode == 'hedge_distance':
         strike_estimate = search_value

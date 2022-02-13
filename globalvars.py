@@ -123,10 +123,13 @@ def ini(entry_name, default_value=None):
         prn('no option: %s return default value' % entry_name,'yellow')
         return default_value
 def trade_scheme(ini_str):
-    trade_scheme_list = list(map(lambda x:x.split('='),ini_str.split(',')))
-    weekdays = trade_scheme_list[0][1]
-    weekdays = list(map(int,weekdays)) if len(weekdays) > 1 else int(weekdays) if len(weekdays) > 0 else 0
-    expiration_term = trade_scheme_list[1][1]
+    # trade_scheme_list = list(map(lambda x:x.split('='),ini_str.split(',')))
+    ini_list = ini_str.split(';')
+    weekdays_ini_str = ini_list[0]
+    weekdays_list_str = weekdays_ini_str.split('=')[1]
+    weekdays_list = weekdays_list_str.split(',')
+    weekdays = list(map(int,weekdays_list))
+    expiration_term = ini_list[1].split('=')[1]
     if len(expiration_term) == 0:
         days_to_expiration = 0
     elif expiration_term[-1:] == 'w':

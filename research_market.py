@@ -1,22 +1,6 @@
 import pandas as pd
 from dateutil.relativedelta import *
 
-def merge():
-    df = pd.DataFrame({'d': ['m24','m24','m1','m1','t2','t2','m8','m8','t9','t9'],
-                       'e': ['m1','m1','t9','t9','t9','t9','m15','m15','m15','m15'],
-                       's':[100,101,111,112,111,112,131,132,131,132]})
-    df_exp = df[['e']].drop_duplicates(subset='e')
-    print(df_exp)
-    df = df_exp.merge(df,left_on='e',right_on='d')
-    print(df)
-
-def dic():
-    d = {'type': ['C','C','C'], 'side': ['S', 'S', 'L']}
-    print(type(d))
-    a = [1,2]
-    print(type(a))
-    b = (1,2)
-    print(type(b))
 def add_days(dt):
     return dt + relativedelta(days=7)
 
@@ -31,8 +15,16 @@ def spy():
     m = df1.iloc[df1['delta'].argsort()][-30:]
     print(df1['delta'].max())
     print(m)
+def pattern():
+    df = pd.read_csv('../data/SPY-yahoo.csv')
+    df['Date'] = pd.to_datetime(df['Date'])
+    df1 = df['Close'].iloc[:3]
+    df2 = df['Open'].iloc[:3]
 
-def learn():
-    merge()
+    print('df1',df1)
+    print('df2',df2)
+    print('dif',df1-df2)
+    print(140.539993 - 141.330002)
 if __name__ == '__main__':
-    spy()
+
+    pattern()

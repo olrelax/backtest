@@ -144,7 +144,7 @@ def open_routine(opt_type,opt_side,primary,opts, date: datetime, algo, exp_param
     forced_exit = date == s2d(gv.forced_exit_date) if ntn(gv.forced_exit_date) else False
     not_skip_date_criteria = date not in gv.skip_dates_list
     day_criteria = (weekday_criteria or force_open) and not_skip_date_criteria
-    if algo in ('base_on_atm', 'nn', 'distance', 'hedge_distance','hedge_discount', 'fixprice'):
+    if algo in ('discount','base_on_atm', 'nn', 'distance', 'hedge_distance','hedge_discount', 'fixprice'):
         open_criteria = not z.is_open() and not forced_exit and day_criteria and not exclude_date_criteria
     elif algo == 'get_right_atm':
         open_criteria = is_short
