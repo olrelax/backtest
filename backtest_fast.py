@@ -6,7 +6,7 @@ from os import system
 draw_or_show = ''
 start_date = '2020-01-01'
 type1,type2,side1,side2 = 'C','P',1,1
-premium_limit = 100
+premium_limit = 1.
 fn = ''
 plot_under = None
 single_pos_len = 0
@@ -106,7 +106,7 @@ def backtest(types,sides,params):
 
         dfi = get_df(params[i],sides[i],types[i])
         dfi = dfi.rename(columns={'strike':'strike_%d' % i,'underlying_bid_1545_x':'under_in_%d' % i,'bid_1545_x':'bid_in_%d' % i,'ask_1545_x':'ask_in_%d' % i,'underlying_bid_1545_y':'under_out_%d' % i,'bid_1545_y':'bid_out_%d' % i,'ask_1545_y':'ask_out_%d' % i,'profit':'profit_%d' % i})
-        dfi = dfi[['expiration','strike_%d' % i,'under_in_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i,'under_out_%d' % i,'bid_out_%d' % i,'ask_out_%d' % i,'profit_%d' % i]]
+        dfi = dfi[['quote_date','expiration','under_in_%d' % i,'strike_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i,'under_out_%d' % i,'bid_out_%d' % i,'ask_out_%d' % i,'profit_%d' % i]]
         single_pos_len = dfi.shape[1] - 1 if i == 0 else single_pos_len
         df = dfi if i == 0 else pd.merge(df,dfi,on='expiration')
     df = df.loc[(df['bid_in_0'] < premium_limit) & (df['bid_in_0'] > premium_min)].copy()
@@ -128,10 +128,10 @@ def backtests():
     global draw_or_show, start_date, premium_limit,fn,plot_under,algo,premium_min
     types = ['P','P']
     sides = ['S','L']
-    params = [15,25]
+    params = [10]
     algo = 'disc'
-    premium_limit = 1.
-    premium_min = 0.1
+    premium_limit = 100
+    premium_min = 0.0
     start_date = '2020-01-01'
     plot_under = False
     draw_or_show = 'show'

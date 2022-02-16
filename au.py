@@ -18,48 +18,6 @@ def get_latest_trade_day(date):
     else:
         return gv.stock.loc[gv.stock['date'] <= s2d(date)]['date'].iloc[-1]
 
-def get_monthly_opts(date, opts,opt_type):
-    possible_exp = add_days(last_month_day(date), max(gv.days2exp_1,gv.days2exp_2) + 5)
-    if opt_type == 'C':
-        if opts is None:
-            gv.opts_annual_C = read_opt(date.year,date,opt_type)
-            opts = gv.opts_annual_C.loc[gv.opts_annual_C['quote_date'] >= date].loc[gv.opts_annual_C['quote_date'] <= possible_exp]
-        elif date.month > opts['quote_date'].iloc[0].month or date.year > opts['quote_date'].iloc[0].year:
-            if date.year == opts['quote_date'].iloc[0].year:
-                opts = gv.opts_annual_C.loc[gv.opts_annual_C['quote_date'] >= date].loc[gv.opts_annual_C['quote_date'] <= possible_exp]
-            else:
-                if gv.opts_annual_next_year_C['quote_date'].iloc[0].year == date.year:
-                    gv.opts_annual_C = gv.opts_annual_next_year_C
-                else:
-                    exit('hm...')
-                opts = gv.opts_annual_C.loc[gv.opts_annual_C['quote_date'] >= date].loc[gv.opts_annual_C['quote_date'] <= possible_exp]
-        else:
-            return opts
-        if possible_exp.year > opts['quote_date'].iloc[-1].year:
-            gv.opts_annual_next_year_C = read_opt(possible_exp.year,date,opt_type)
-            if gv.opts_annual_next_year_C is not None:
-                opts = opts.append(gv.opts_annual_next_year_C.loc[gv.opts_annual_next_year_C['quote_date'] <= possible_exp], ignore_index=True)
-        return opts
-    else:
-        if opts is None:
-            gv.opts_annual_P = read_opt(date.year,date,opt_type)
-            opts = gv.opts_annual_P.loc[gv.opts_annual_P['quote_date'] >= date].loc[gv.opts_annual_P['quote_date'] <= possible_exp]
-        elif date.month > opts['quote_date'].iloc[0].month or date.year > opts['quote_date'].iloc[0].year:
-            if date.year == opts['quote_date'].iloc[0].year:
-                opts = gv.opts_annual_P.loc[gv.opts_annual_P['quote_date'] >= date].loc[gv.opts_annual_P['quote_date'] <= possible_exp]
-            else:
-                if gv.opts_annual_next_year_P['quote_date'].iloc[0].year == date.year:
-                    gv.opts_annual_P = gv.opts_annual_next_year_P
-                else:
-                    exit('hm...')
-                opts = gv.opts_annual_P.loc[gv.opts_annual_P['quote_date'] >= date].loc[gv.opts_annual_P['quote_date'] <= possible_exp]
-        else:
-            return opts
-        if possible_exp.year > opts['quote_date'].iloc[-1].year:
-            gv.opts_annual_next_year_P = read_opt(possible_exp.year,date,opt_type)
-            if gv.opts_annual_next_year_P is not None:
-                opts = opts.append(gv.opts_annual_next_year_P.loc[gv.opts_annual_next_year_P['quote_date'] <= possible_exp], ignore_index=True)
-        return opts
 
 
 def fl(arg):
@@ -74,22 +32,15 @@ def read_stock():
     stock = stock_1[stock_1['date'] >= start_date].copy().reset_index(drop=True)
     return stock
 
-last_year = 3200
-def read_opt(year,date,opt_type):
-    global last_year
-    if year > last_year:
-        return None
-    print('%s: read options hist %d ...' % (d2s(date),year))
+def read_opt(year,opt_type):
     fn = '../data/SPY_CBOE_%d_%s.csv' % (year,opt_type)
     try:
         opts = pd.read_csv(fn, index_col=0)
     except FileNotFoundError:
         prn('No such file %s' % fn,'blue')
-        last_year = year
         return None
     opts['quote_date'] = pd.to_datetime(opts['quote_date'], format='%Y-%m-%d')
     opts['expiration'] = pd.to_datetime(opts['expiration'], format='%Y-%m-%d')
-    print('done')
     return opts
 
 def ts(date=datetime.now()):
