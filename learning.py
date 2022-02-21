@@ -10,6 +10,16 @@ def merge():
     df = df_exp.merge(df,left_on='e',right_on='d')
     print(df)
 
+def locd():
+    df_in2exp = pd.DataFrame({'date': [1,2,3],
+                       'exp': [3,4,5],
+                       's':[100,101,102]})
+
+    df_all = pd.DataFrame({'date': [1,2,3,2,3,4,3,4,5],
+                            'exp': [3,3,3,4,4,4,5,5,5],
+                              's':[100,101,101,102,102,102,103,103,103]})
+    print(df_all)
+
 def dic():
     d = {'type': ['C','C','C'], 'side': ['S', 'S', 'L']}
     print(type(d))
@@ -32,7 +42,5 @@ def spy():
     print(df1['delta'].max())
     print(m)
 
-def learn():
-    merge()
 if __name__ == '__main__':
-    spy()
+    locd()

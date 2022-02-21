@@ -2,9 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import inspect
+from au import read_opt
 from os import system
 draw_or_show = ''
-start_date = '2020-01-01'
+start_year = 0
 type1,type2,side1,side2 = 'C','P',1,1
 premium_limit = 1.
 fn = ''
@@ -34,15 +35,15 @@ def plot(df,types,sides,params):
         cols = cols + 'sum'
         dfp = df[cols.split(',')]
     dfp = dfp.set_index('expiration')
-    txt = '{}, type {}, side {},param {},lim {}'.format(algo,types,sides,params,premium_limit)
+    txt = '{}, type {}, side {},param {},lim max {},lim min {} '.format(algo,types,sides,params,premium_limit,premium_min)
     ax = dfp.plot(figsize=(10,7), title=txt)
     xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')
     ax.set_xticks(xtick, minor=True)
     ax.grid('on', which='minor')
     ax.grid('on', which='major')
-    ylim_bottom = -250
-    ylim_top = 350
-    # ax.set_ylim(ylim_bottom,ylim_top)
+    ylim_bottom = -60
+    ylim_top = 80
+    ax.set_ylim(ylim_bottom,ylim_top)
     plt.savefig('../out/c-%s.png' % fn)
 
     if draw_or_show == 'draw':
@@ -62,9 +63,8 @@ def save(dtf,arg_name=None):
     dtf.to_csv('../out/%s.csv' % name,index=False)
 def get_sold(price):
     return 0 if price < 0.0101 else price
-def get_df(param,side,opt_type):
-    global start_date
-    bd = datetime.strptime(start_date,'%Y-%m-%d')
+def get_df_for_side(param,side,opt_type):
+    bd = datetime.strptime('%d-01-01' % start_year,'%Y-%m-%d')
     opts_fn = '../data/weekly_%s.csv' % opt_type
     df = pd.read_csv(opts_fn)
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
@@ -96,7 +96,13 @@ def get_df(param,side,opt_type):
     o = o[['quote_date','expiration','strike','underlying_bid_1545_x','bid_1545_x','ask_1545_x','ask_1545_x','exp_weekday','days_to_exp','underlying_bid_1545_y','bid_1545_y','ask_1545_y','profit']]
     o.sort_values(['quote_date','expiration'])
     return o
-
+def get_df_all_dates(tp):
+    opts = None
+    for y in range(2022 - start_year):
+        y_opts = read_opt('%d' % (start_year + y), tp)
+        # y_opts = y_opts.loc[(y_opts['strike'] >= min_strike)(y_opts['strike'] <= max_strike)]
+        opts = y_opts if y == 0 else y_opts.append(y_opts,ignore_index=True)
+    return opts
 def backtest(types,sides,params):
     global single_pos_len
     count = min(len(types),len(sides),len(params))
@@ -104,12 +110,15 @@ def backtest(types,sides,params):
 
     for i in range(count):
 
-        dfi = get_df(params[i],sides[i],types[i])
-        dfi = dfi.rename(columns={'strike':'strike_%d' % i,'underlying_bid_1545_x':'under_in_%d' % i,'bid_1545_x':'bid_in_%d' % i,'ask_1545_x':'ask_in_%d' % i,'underlying_bid_1545_y':'under_out_%d' % i,'bid_1545_y':'bid_out_%d' % i,'ask_1545_y':'ask_out_%d' % i,'profit':'profit_%d' % i})
-        dfi = dfi[['quote_date','expiration','under_in_%d' % i,'strike_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i,'under_out_%d' % i,'bid_out_%d' % i,'ask_out_%d' % i,'profit_%d' % i]]
-        single_pos_len = dfi.shape[1] - 1 if i == 0 else single_pos_len
-        df = dfi if i == 0 else pd.merge(df,dfi,on='expiration')
+        df_in2exp = get_df_for_side(params[i],sides[i],types[i])
+        df_in2exp = df_in2exp.rename(columns={'strike':'strike_%d' % i,'underlying_bid_1545_x':'under_in_%d' % i,'bid_1545_x':'bid_in_%d' % i,'ask_1545_x':'ask_in_%d' % i,'underlying_bid_1545_y':'under_out_%d' % i,'bid_1545_y':'bid_out_%d' % i,'ask_1545_y':'ask_out_%d' % i,'profit':'profit_%d' % i})
+        df_in2exp = df_in2exp[['quote_date','expiration','under_in_%d' % i,'strike_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i,'under_out_%d' % i,'bid_out_%d' % i,'ask_out_%d' % i,'profit_%d' % i]]
+#        df_all_dates = get_df_all_dates(types[i])
+
+        single_pos_len = df_in2exp.shape[1] - 1 if i == 0 else single_pos_len
+        df = df_in2exp if i == 0 else pd.merge(df,df_in2exp,on='expiration')
     df = df.loc[(df['bid_in_0'] < premium_limit) & (df['bid_in_0'] > premium_min)].copy()
+
     for i in range(count):
         df['sum_%d' % i] = df['profit_%d' % i].cumsum(axis=0)
         df['sum'] = df['sum_%d' % i] if i == 0 else df['sum'] + df['sum_%d' % i]
@@ -125,14 +134,14 @@ def save_test(df,types,sides,params):
 
 
 def backtests():
-    global draw_or_show, start_date, premium_limit,fn,plot_under,algo,premium_min
+    global draw_or_show, start_year, premium_limit,fn,plot_under,algo,premium_min
     types = ['P','P']
     sides = ['S','L']
-    params = [10]
+    params = [12,30]
     algo = 'disc'
-    premium_limit = 100
-    premium_min = 0.0
-    start_date = '2020-01-01'
+    premium_limit = 1.2
+    premium_min = 0.1
+    start_year = 2020
     plot_under = False
     draw_or_show = 'show'
     df = backtest(types,sides,params)

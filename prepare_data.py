@@ -142,7 +142,7 @@ def save(dtf,arg_name=None):
     dtf.to_csv('../out/%s.csv' % name,index=False)
 
 def loc_weekly_exp_spy_cboe(y,t):
-    o = read_opt(y,datetime.now(),t)
+    o = read_opt(y,t)
     o['quote_date'] = pd.to_datetime(o['quote_date'])
     o['expiration'] = pd.to_datetime(o['expiration'])
     d = o[['quote_date','expiration','strike','underlying_bid_1545','bid_1545','ask_1545','weekday','exp_weekday','days_to_exp']]
