@@ -141,17 +141,29 @@ def save(dtf,arg_name=None):
     name = get_name(dtf)[0] if arg_name is None else arg_name
     dtf.to_csv('../out/%s.csv' % name,index=False)
 
-def loc_weekly_exp_spy_cboe(y,t):
+def loc_weekly_exp_spy_cboe(y,t,exact=True):
     o = read_opt(y,t)
     o['quote_date'] = pd.to_datetime(o['quote_date'])
     o['expiration'] = pd.to_datetime(o['expiration'])
     d = o[['quote_date','expiration','strike','underlying_bid_1545','bid_1545','ask_1545','weekday','exp_weekday','days_to_exp']]
-    qd8 = d.loc[(d['days_to_exp'] == 0) | (d['days_to_exp'] == 6) | (d['days_to_exp'] == 7) | (d['days_to_exp'] == 8)]
+    # qd8 = d.loc[(d['days_to_exp'] == 0) | (d['days_to_exp'] == 6) | (d['days_to_exp'] == 7) | (d['days_to_exp'] == 8)]
+    if exact:
+        qd8 = d.loc[((d['days_to_exp'] == 0) | (d['days_to_exp'] == 7)) & ((d['weekday'] == 1) | (d['weekday'] == 3) | (d['weekday'] == 5))]
+    else:
+        qd8 = d.loc[(d['days_to_exp'] == 0) | (d['days_to_exp'] == 7) | ((d['days_to_exp'] == 6) & d['weekday'] == 2) | ((d['days_to_exp'] == 8) & (d['weekday'] == 1))]
     d_exp = qd8[['expiration']].drop_duplicates(subset=['expiration'])
     dm = d_exp.merge(qd8,left_on='expiration',right_on='quote_date').drop(columns='expiration_x').rename(columns={'expiration_y':'expiration'})
-    save(dm)
+    print('%d%s done' % (y,t))
     return dm
 
+def make_long_file(start_year):
+    df_all = None
+    for step in range(2022 - start_year + 1):
+        y = start_year + step
+        y_opts = read_opt(y,'P')
+        df_all = y_opts if step == 0 else df_all.append(y_opts,ignore_index=True)
+    df_all['pair_all'] = df_all['quote_date'].astype(str) + df_all['expiration'].astype(str)
+    df_all.to_csv('../data/SPY_CBOE_%d-2022_P.csv' % start_year)
 
 def process_data(ch,arg_1=None,arg_2=None):
     if ch == 'y':
@@ -176,9 +188,11 @@ def process_data(ch,arg_1=None,arg_2=None):
             w = w.append(loc_weekly_exp_spy_cboe(2021,'C'),ignore_index=True)
             weekly_c = w.append(loc_weekly_exp_spy_cboe(2022,'C'),ignore_index=True)
             weekly_c.to_csv('../data/weekly_C.csv',index=False)
+    elif ch == 'mlf':
+        make_long_file(2020)
 
 def select_task():
-    process_data('lwe')
+    process_data('mlf')
 
 if __name__ == '__main__':
     select_task()
