@@ -67,6 +67,16 @@ def save(dtf,arg_name=None):
     dtf.to_csv('../devel/%s.csv' % name,index=True)
 def get_sold(price):
     return 0 if price < 0.0101 else price
+def read_opt_file(ofn):
+    df = pd.read_csv(ofn)
+    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
+    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+    return df
+def get_strike_loss(df):
+    df_loss = df.loc[df['strike_0'] - df['under_in_0'] > strike_loss_limit].copy()
+    df_loss['str_loss'] = df_loss['strike_0'] - df_loss['under_in_0']
+    df_loss = df_loss.drop_duplicates(subset=['expiration'])
+    return df_loss
 
 def get_df_for_side(param,side,opt_type):
     bd = datetime.strptime('%d-01-01' % start_year,'%Y-%m-%d')
@@ -103,16 +113,6 @@ def get_df_for_side(param,side,opt_type):
     o = o[['quote_date','expiration','strike','underlying_ask_1545_x','bid_1545_x','ask_1545_x','exp_weekday','days_to_exp','underlying_bid_1545_y','bid_1545_y','ask_1545_y','profit']]
     o.sort_values(['quote_date','expiration'])
     return o
-def read_opt_file(ofn):
-    df = pd.read_csv(ofn)
-    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
-    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
-    return df
-def get_strike_loss(df):
-    df_loss = df.loc[df['strike_0'] - df['under_in_0'] > strike_loss_limit].copy()
-    df_loss['str_loss'] = df_loss['strike_0'] - df_loss['under_in_0']
-    df_loss = df_loss.drop_duplicates(subset=['expiration'])
-    return df_loss
 def get_df_between(df_in2exp,side,tp,i):
     side_sign = 1. if side == 'S' else -1.
     df_in2exp['pair_in'] = df_in2exp['quote_date'].astype(str)+df_in2exp['expiration'].astype(str)
@@ -123,12 +123,12 @@ def get_df_between(df_in2exp,side,tp,i):
     df_mix = df_all.merge(df_in2exp,on=['expiration','strike_%d' % i]).sort_values(['expiration','quote_date_x'])
     df_between = df_mix[(~df_mix.pair_all.isin(df_in2exp.pair_in))].sort_values(['expiration','quote_date_x'])
     df_between = df_between.loc[~(df_between['quote_date_x'] == df_between['expiration'])]
-    df_between = df_between[['quote_date_x', 'expiration', 'underlying_bid_1545', 'strike_%d' % i, 'bid_1545', 'ask_1545']]
+    df_between = df_between[['quote_date_x', 'expiration', 'underlying_ask_1545', 'strike_%d' % i, 'bid_1545', 'ask_1545']]
     df_between = df_between.rename(
-        columns={'quote_date_x':'quote_date', 'underlying_bid_1545': 'under_in_%d' % i, 'bid_1545': 'bid_out_%d' % i,
+        columns={'quote_date_x':'quote_date', 'underlying_ask_1545': 'under_in_%d' % i, 'bid_1545': 'bid_out_%d' % i,
                  'ask_1545': 'ask_out_%d' % i})
     df_between = df_between.merge(df_in2exp[['expiration','strike_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i]],on=['expiration','strike_%d' % i])
-    df_between['under_out_%d' % i] = df_between['under_in_%d' % i]         # just mirroring for compatibility
+    df_between['under_out_%d' % i] = df_between['under_in_%d' % i]         # just mirroring for compatibility with df_in2exp
     df_between = df_between[['quote_date','expiration','under_in_%d' % i,'strike_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i,'under_out_%d' % i,'bid_out_%d' % i,'ask_out_%d' % i]]
     df_between['profit_%d' % i] = (df_between['bid_in_%d' % i] - df_between['ask_out_%d' % i]) * side_sign
     df_between = get_strike_loss(df_between)
@@ -146,6 +146,7 @@ def backtest(types,sides,params):
         df_in2exp = get_df_for_side(params[i],sides[i],types[i])
         df_in2exp = df_in2exp.rename(columns={'strike':'strike_%d' % i,'underlying_ask_1545_x':'under_in_%d' % i,'bid_1545_x':'bid_in_%d' % i,'ask_1545_x':'ask_in_%d' % i,'underlying_bid_1545_y':'under_out_%d' % i,'bid_1545_y':'bid_out_%d' % i,'ask_1545_y':'ask_out_%d' % i,'profit':'profit_%d' % i})
         df_in2exp = df_in2exp[['quote_date','expiration','under_in_%d' % i,'strike_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i,'under_out_%d' % i,'bid_out_%d' % i,'ask_out_%d' % i,'profit_%d' % i]]
+        save(df_in2exp)
         df_between = get_df_between(df_in2exp,sides[i],types[i],i)
         df_in2exp = df_in2exp.drop(columns={'pair_in'})
         df_cont = df_in2exp.append(df_between,ignore_index=True).sort_values(['expiration','quote_date'])
@@ -177,7 +178,7 @@ def backtests():
     algo = 'disc'
     premium_max = 200.5
     premium_min = 0.00
-    strike_loss_limit = 100
+    strike_loss_limit = 0
     start_year = 2020
     before_date = '2021-01-01'
     plot_under = False
