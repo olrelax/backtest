@@ -145,7 +145,7 @@ def loc_weekly_exp_spy_cboe(y,t,exact=True):
     o = read_opt(y,t)
     o['quote_date'] = pd.to_datetime(o['quote_date'])
     o['expiration'] = pd.to_datetime(o['expiration'])
-    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','bid_1545','ask_1545','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
+    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
     # qd8 = d.loc[(d['days_to_exp'] == 0) | (d['days_to_exp'] == 6) | (d['days_to_exp'] == 7) | (d['days_to_exp'] == 8)]
     if exact:
         qd8 = d.loc[((d['days_to_exp'] == 0) | (d['days_to_exp'] == 7)) & ((d['weekday'] == 1) | (d['weekday'] == 3) | (d['weekday'] == 5))]
