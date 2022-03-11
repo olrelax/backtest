@@ -2,12 +2,13 @@ import pandas as pd
 from dateutil.relativedelta import *
 from au import s2d
 def merge():
-    df = pd.DataFrame({'d': ['m24','m24','m1','m1','t2','t2','m8','m8','t9','t9'],
-                       'e': ['m1','m1','t9','t9','t9','t9','m15','m15','m15','m15'],
-                       's':[100,101,111,112,111,112,131,132,131,132]})
-    df_exp = df[['e']].drop_duplicates(subset='e')
-    print(df_exp)
-    df = df_exp.merge(df,left_on='e',right_on='d')
+    dfl = pd.DataFrame({'d': ['d1','d2','d3'],
+                       'e': ['e1','e2','e3'],
+                       's':[100,101,111]})
+    dfr = pd.DataFrame({'d': ['d1','d2','d4'],
+                       'e': ['e1','e2','e4'],
+                       's':[110,111,121]})
+    df = pd.merge(dfl,dfr,on=['d','e'],how='outer')
     print(df)
 
 def locd():
@@ -81,4 +82,4 @@ def tax():
     bank = bank.append(total,ignore_index=True)
     bank.to_csv('../out/bank.csv',index=False)
 if __name__ == '__main__':
-    locs()
+    merge()

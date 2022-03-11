@@ -2,18 +2,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import inspect
-from au import s2d
+from au import read_opt_file
+from functions import get_df_between_1,get_strike_loss,save
 from os import system
 draw_or_show = ''
 start_year = 0
 before_date = ''
-premium_max = 1.
 fn = ''
 plot_under = None
 single_pos_len = 0
 algo = ''
 comm = 0
-premium_min = 100.0
 strike_loss_limit = -100
 ylim_bottom = -100
 ylim_top = 100
@@ -40,7 +39,7 @@ def plot(df,types,sides,params):
         cols = cols + 'sum'
         dfp = df[cols.split(',')]
     dfp = dfp.set_index('expiration')
-    txt = '{}, type {}, side {},param {},lim max {},lim min {} '.format(algo,types,sides,params,premium_max,premium_min)
+    txt = '{}, type {}, side {},param {}, str_loss_lim{}'.format(algo,types,sides,params,strike_loss_limit)
     ax = dfp.plot(figsize=(11,7), title=txt)
     xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')
     ax.set_xticks(xtick, minor=True)
@@ -60,7 +59,7 @@ def save_test(df,types,sides,params):
     global fn
     fn = datetime.strftime(datetime.now(), '%d-%-H-%M-%S')
     ini = open('../out/i-%s.txt' % fn,'w')
-    print('type {},sides{},params{}, max {}, min {}, str.loss {}'.format(types,sides,params,premium_max,premium_min,strike_loss_limit),file=ini)
+    print('type {},sides{},params{}, str_loss_lim {}'.format(types,sides,params,strike_loss_limit),file=ini)
     ini.close()
     # noinspection PyTypeChecker
     df.to_csv('../out/e-%s.csv' % fn, index=False)
@@ -69,31 +68,31 @@ def get_name(var):
     callers_local_vars = inspect.currentframe().f_back.f_back.f_locals.items()
     return [var_name for var_name, var_val in callers_local_vars if var_val is var]
 
-def save(dtf,arg_name=None):
-    name = get_name(dtf)[0] if arg_name is None else arg_name
-    print('save',name)
-    dtf.to_csv('../devel/%s.csv' % name,index=True)
+#def save(dtf,arg_name=None):
+#    name = get_name(dtf)[0] if arg_name is None else arg_name
+#    print('save',name)
+#    dtf.to_csv('../devel/%s.csv' % name,index=True)
 def get_sold(price):
     return 0 if price < 0.0101 else price
-def read_opt_file(ofn):
-    df = pd.read_csv(ofn)
-    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
-    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
-    return df
-def get_strike_loss(df,i,field):
-    df_loss = df.copy()
-    # df_loss['str_loss_%d' % i] = df_loss['strike_%d' % i] - df_loss['under_bid_in_%d' % i]
-    df_loss['str_loss_%d' % i] = df_loss['strike_%d' % i] - df_loss['%s_%d' % (field,i)]
-    df_loss = df_loss.loc[df_loss['str_loss_%d' % i] > strike_loss_limit]
-    df_loss = df_loss.drop_duplicates(subset=['expiration'])
+#def read_opt_file(ofn):
+#    df = pd.read_csv(ofn)
+#    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
+#    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+#    return df
+#def get_strike_loss(df,i,field):
+#    df_loss = df.copy()
+#    # df_loss['str_loss_%d' % i] = df_loss['strike_%d' % i] - df_loss['under_bid_in_%d' % i]
+#    df_loss['str_loss_%d' % i] = df_loss['strike_%d' % i] - df_loss['%s_%d' % (field,i)]
+#    df_loss = df_loss.loc[df_loss['str_loss_%d' % i] > strike_loss_limit]
+#    df_loss = df_loss.drop_duplicates(subset=['expiration'])
 
-    return df_loss
-def show(df,stop=True):
-    name = get_name(df)[0]
-    print('-----------------%s------------' % name)
-    print(df.info())
-    if stop:
-        exit()
+#    return df_loss
+#def show(df,stop=True):
+#    name = get_name(df)[0]
+#    print('-----------------%s------------' % name)
+#    print(df.info())
+#    if stop:
+#        exit()
 def get_in2exp(param,side,opt_type,i):
     bd = datetime.strptime('%d-01-01' % start_year,'%Y-%m-%d')
     ed = datetime.strptime(before_date,'%Y-%m-%d')
@@ -132,7 +131,7 @@ def get_in2exp(param,side,opt_type,i):
                           'bid_1545':'bid_in_%d' % i,'ask_1545':'ask_in_%d' % i,'underlying_bid_eod':'under_bid_out_%d' % i,
                           'underlying_ask_eod':'under_ask_out_%d' % i,'bid_eod':'bid_out_%d' % i,'ask_eod':'ask_out_%d' % i,
                           'margin':'margin_%d' % i})
-    o_loss = get_strike_loss(o,i,'under_bid_1545_out')
+    o_loss = get_strike_loss(o,i,'under_bid_1545_out',strike_loss_limit) if side == 'S' else ''
     o = o.drop(columns={'under_bid_1545_out_%d' % i, 'under_ask_1545_out_%d' % i, 'bid_1545_out_%d' % i, 'ask_1545_out_%d' % i})
     if len(o_loss) > 0:
         o_loss = o_loss.drop(columns={'under_bid_out_%d'%i,'under_ask_out_%d'%i,'bid_out_%d'%i,'ask_out_%d'%i})
@@ -149,7 +148,7 @@ def get_df_between(df_in2exp,side,tp,i):
     df_all = df_all.loc[df_all.days_to_exp < 8]
 
     df_all = df_all.rename(columns={'strike':'strike_%d' % i})
-    df_in2exp2exclude = df_in2exp[['quote_date','expiration','strike_%d' % i,'pair_in']]
+    df_in2exp2exclude = df_in2exp[['quote_date','expiration','strike_%d' % i,'pair_in']]   # list of contacts lasted till on expiration
     df_mix = df_all.merge(df_in2exp2exclude,on=['expiration','strike_%d' % i])
     df_between = df_mix[(~df_mix.pair_all.isin(df_in2exp2exclude.pair_in))]
     df_between = df_between.loc[~(df_between['quote_date_x'] == df_between['expiration'])]
@@ -165,7 +164,7 @@ def get_df_between(df_in2exp,side,tp,i):
     df_between = df_between[['quote_date','expiration','strike_%d' % i,'under_bid_in_%d' % i,'under_ask_in_%d' % i,'bid_in_%d' % i,'ask_in_%d' % i,
                              'under_bid_out_%d' % i,'under_ask_out_%d' % i,'bid_out_%d' % i,'ask_out_%d' % i]]
     df_between['margin_%d' % i] = (df_between['bid_in_%d' % i] - df_between['ask_out_%d' % i]) * side_sign
-    df_between = get_strike_loss(df_between,i,'under_bid_in')
+    df_between = get_strike_loss(df_between,i,'under_bid_in',strike_loss_limit)
     return df_between
 
 
@@ -177,17 +176,19 @@ def backtest(types,sides,params):
 
     for i in range(count):
         df_in2exp = get_in2exp(params[i],sides[i],types[i],i)
-        if count == 1 and strike_loss_limit is not None:
-            df_between = get_df_between(df_in2exp,sides[i],types[i],i)
+        #if count == 1 and strike_loss_limit is not None:
+        if strike_loss_limit is not None and i == 0:
+            df_between = get_df_between_1(df_in2exp,sides[i],types[i],i,strike_loss_limit)
             df_in2exp = df_in2exp.drop(columns={'pair_in'})
             df_cont = df_in2exp.append(df_between,ignore_index=True).sort_values(['expiration','quote_date'])
             df_cont = df_cont.drop_duplicates(subset=['expiration'],keep='last')      # drop expiration record if exit occurred before
         else:
             df_cont = df_in2exp
+        save(df_cont,'df_cont_%d'%i)
         single_pos_len = df_cont.shape[1] - 1 if i == 0 else single_pos_len
-        df = df_cont if i == 0 else pd.merge(df,df_cont,on='expiration')
-    df = df.loc[(df['bid_in_0'] < premium_max) & (df['bid_in_0'] > premium_min)].copy()
-
+        df = df_cont if i == 0 else pd.merge(df,df_cont,on=['quote_date','expiration'],how='outer')
+    # df = df.loc[(df['bid_in_0'] < premium_max) & (df['bid_in_0'] > premium_min)].copy()
+    df = df.sort_values(['quote_date','expiration'])
     for i in range(count):
         df['sum_%d' % i] = df['margin_%d' % i].cumsum(axis=0)
         df['sum'] = df['sum_%d' % i] if i == 0 else df['sum'] + df['sum_%d' % i]
@@ -195,19 +196,20 @@ def backtest(types,sides,params):
 
 
 def backtests():
-    global before_date,draw_or_show, start_year,  premium_max,fn,plot_under,algo,premium_min,strike_loss_limit
+    global before_date,draw_or_show, start_year, fn,plot_under,algo,strike_loss_limit
     types = ['P','P']
     sides = ['S','L']
-    params = [13,25]
+    params = [3,7]
     algo = 'disc'
-    premium_max = 2.5
-    premium_min = 0.00
-    strike_loss_limit = None
+    strike_loss_limit = 0  # in USD, not in %
     start_year = 2020
     before_date = '2023-01-01'
     plot_under = False
     draw_or_show = 'show'
     df = backtest(types,sides,params)
+    df['sum'] = df['sum'].fillna(method='ffill')
+    for i in range(len(params)):
+        df['sum_%d' % i] = df['sum_%d' % i].fillna(method='ffill')
     save_test(df,types,sides,params)
     plot(df,types,sides,params)
     if draw_or_show == 'draw':

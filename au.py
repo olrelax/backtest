@@ -18,6 +18,11 @@ def get_latest_trade_day(date):
     else:
         return gv.stock.loc[gv.stock['date'] <= s2d(date)]['date'].iloc[-1]
 
+def read_opt_file(ofn):
+    df = pd.read_csv(ofn)
+    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
+    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+    return df
 
 
 def fl(arg):
@@ -45,6 +50,7 @@ def read_opt(year,opt_type):
 
 def ts(date=datetime.now()):
     return time.mktime(date.timetuple())
+
 
 
 def d2s(dtm,fmt='%Y-%m-%d'):
