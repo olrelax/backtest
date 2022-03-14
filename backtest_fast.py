@@ -239,7 +239,7 @@ def backtest(types, sides, params):
 def backtests():
     global algo, before_date,draw_or_show, start_year, fn, plot_under,strike_loss_limit
     types = ['P', 'P']
-    sides = ['S']
+    sides = ['S','L']
     params = [7,12]
     algo = 'disc'
     strike_loss_limit = -5  # in USD, not in %
