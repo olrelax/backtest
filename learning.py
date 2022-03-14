@@ -1,16 +1,39 @@
 import pandas as pd
 from dateutil.relativedelta import *
 from au import s2d
-def merge():
-    dfl = pd.DataFrame({'d': ['d1','d2','d3'],
-                       'e': ['e1','e2','e3'],
-                       's':[100,101,111]})
-    dfr = pd.DataFrame({'d': ['d1','d2','d4'],
-                       'e': ['e1','e2','e4'],
-                       's':[110,111,121]})
-    df = pd.merge(dfl,dfr,on=['d','e'],how='outer')
-    print(df)
+import numpy as np
+def from_d1_subtract_od2(d1,d2,cols):
+    isin_list = d2[cols].to_numpy()
+    idx = d1[cols].isin(isin_list)
+    print(idx)
+    exit()
+    if isinstance(cols, str):
+        exit('err1')
+    if len(cols) == 1:
+        idx1 = idx[cols[0]]
+    elif len(cols) == 2:
+        idx1 = idx[cols[0]] & idx[cols[1]]
+    elif len(cols) == 3:
+        idx1 = idx[cols[0]] & idx[cols[1]] & idx[cols[2]]
+    elif len(cols) == 4:
+        idx1 = idx[cols[0]] & idx[cols[1]] & idx[cols[2]] & idx[cols[3]]
+    else:
+        idx1 = None
+        exit('err2')
+    return d1.loc[~idx1]
+def from_d1_subtract_d2(d1,d2,subset):
+    df = d1.append(d2).drop_duplicates(subset=subset,keep=False)
+    return df
+def d1_sub_d2():
+    d1 = pd.DataFrame({'d': ['d1','d2','d3','d4'],
+                       'e': ['e3','e1','e2','e4'],
+                       's':['s0','s21',np.NaN,np.NaN]})
 
+    d2 = pd.DataFrame({'d': ['d1','d2'],
+                       'e':['e2','e1'],
+                       's':['s1','s2']})
+    ds = from_d1_subtract_d2(d1,d2,['d','e'])
+    print(ds)
 def locd():
     df_in2exp = pd.DataFrame({'date': [1,2,3],
                        'exp': [3,4,5],
@@ -81,5 +104,8 @@ def tax():
     total = pd.Series({'Date':s2d('2021-12-31'),'Description':'Total','DEB_R':round(sum_deb,2),'CRED_R':round(sum_cred,2)})
     bank = bank.append(total,ignore_index=True)
     bank.to_csv('../out/bank.csv',index=False)
+def para():
+    print()
+
 if __name__ == '__main__':
-    merge()
+    d1_sub_d2()
