@@ -84,15 +84,23 @@ def intraday(date,bottom=None,top=None):
 def td(d):
     return d.days
 
-def get_sftp_cboe(month=None,day=None):
-    if month is None or day is None:
+def get_sftp_cboe(month=None,days_arg=None):
+    days,count,localpath,filename = 0,0,'',''
+    if month is None or days_arg is None:
         now = datetime.now()
         yes = add_days(now,-1)
         month = yes.month
-        day = yes.day
-    filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,day)
-    filepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
-    localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
+        days = yes.day_arg
+        count = 1
+    elif isinstance(days_arg,int):
+        days = [days_arg]
+        count = 1
+    elif isinstance(days_arg,tuple):
+        days = days_arg
+        count = len(days)
+    # filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,day)
+    # filepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
+    # localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
     # paramiko.util.log_to_file("paramiko.log")
     host, port = "sftp.datashop.livevol.com", 22
     transport = paramiko.Transport((host, port))
@@ -101,8 +109,12 @@ def get_sftp_cboe(month=None,day=None):
     transport.connect(None, username, password)
     print('connected')
     sftp = paramiko.SFTPClient.from_transport(transport)
-    print('get %s->%s' % (filepath, localpath))
-    sftp.get(filepath, localpath)
+    for i in range(count):
+        filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,days[i])
+        remotepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
+        localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
+        print('get %s->%s' % (remotepath, localpath))
+        sftp.get(remotepath, localpath)
     if sftp:
         print('received')
         sftp.close()
@@ -162,7 +174,7 @@ def make_long_file(start_year):
         y = start_year + step
         y_opts = read_opt(y,'P')
         df_all = y_opts if step == 0 else df_all.append(y_opts,ignore_index=True)
-    df_all['pair_all'] = df_all['quote_date'].astype(str) + df_all['expiration'].astype(str)
+    # df_all['pair_all'] = df_all['quote_date'].astype(str) + df_all['expiration'].astype(str)
     df_all.to_csv('../data/SPY_CBOE_%d-2022_P.csv' % start_year)
 
 def process_data(ch,arg_1=None,arg_2=None):
@@ -172,7 +184,7 @@ def process_data(ch,arg_1=None,arg_2=None):
         process_cboe_source()
         add_weekday()
     elif ch == 'ftp':
-        get_sftp_cboe(month=arg_1,day=arg_2)
+        get_sftp_cboe(month=arg_1,days_arg=arg_2)
     elif ch == 'lwe':
         what = 'all_years'
         if what == 'all_years':
@@ -192,7 +204,7 @@ def process_data(ch,arg_1=None,arg_2=None):
         make_long_file(2020)
 
 def select_task():
-    process_data('lwe')
+    process_data('mlf')
 
 if __name__ == '__main__':
     select_task()

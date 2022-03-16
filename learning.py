@@ -2,6 +2,7 @@ import pandas as pd
 from dateutil.relativedelta import *
 from au import s2d
 import numpy as np
+import csv
 def from_d1_subtract_od2(d1,d2,cols):
     isin_list = d2[cols].to_numpy()
     idx = d1[cols].isin(isin_list)
@@ -107,5 +108,18 @@ def tax():
 def para():
     print()
 
+def csvr():
+    fnm = '../out/e-14-16-38-15.csv'
+    with open(fnm, mode='r') as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        for row in csv_reader:
+            print(row['expiration'])
+def lists():
+    l1 = [1,2,3]
+    l2 = [4,5,6]
+    ll = [l1,l2]
+    l3 = [7,8,9]
+    ll.append(l3)
+    print(ll)
 if __name__ == '__main__':
-    d1_sub_d2()
+    csvr()
