@@ -192,7 +192,7 @@ def get_in2exp(param, side, opt_type, i):
                           'underlying_ask_eod': 'under_ask_out_%d' % i, 'bid_eod': 'bid_out_%d' % i,
                           'ask_eod': 'ask_out_%d' % i,
                           'margin': 'margin_%d' % i})
-    df_loss = get_strike_loss(df, i, 'under_bid_1545_out') if side == 'S' and not strike_loss_limit == '' else ''
+    df_loss = get_strike_loss(df, i, 'under_bid_1545_out') if side == 'S' and not strike_loss_limit == '' and strike_loss_limit is not None else ''
     df = df.drop(columns={'under_bid_1545_out_%d' % i, 'under_ask_1545_out_%d' % i, 'bid_1545_out_%d' % i,
                         'ask_1545_out_%d' % i})
     if len(df_loss) > 0:
@@ -223,7 +223,7 @@ def backtest(types, sides, params):
         df_in2exp = get_in2exp(params[i], sides[i], types[i], i)
         if i == 0 and premium_limit > 0:
             df_overpriced = df_in2exp.loc[df_in2exp['bid_in_0'] > premium_limit]
-        if not strike_loss_limit == '' and i == 0:
+        if not strike_loss_limit == '' and strike_loss_limit is not None and i == 0:
             df_between = get_df_between(df_in2exp, sides[i], types[i], i)
             df_cont = df_in2exp.append(df_between, ignore_index=True)
             df_cont = df_cont.drop_duplicates(subset=['expiration'],
@@ -254,7 +254,7 @@ def backtests():
     sides = ['S','L']
     params = [7,8]
     algo = 'disc'
-    strike_loss_limit = ''  # in USD if > 1 else in %
+    strike_loss_limit = None  # in USD if > 1 else in %
     start_date = '2020-01-01'
     before_date = '2021-01-01'
     premium_limit = 2.5
