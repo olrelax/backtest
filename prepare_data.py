@@ -90,19 +90,22 @@ def get_sftp_cboe(month=None,days_arg=None):
         now = datetime.now()
         yes = add_days(now,-1)
         month = yes.month
-        days = yes.day_arg
+        days = [yes.day]
         count = 1
     elif isinstance(days_arg,int):
         days = [days_arg]
         count = 1
-    elif isinstance(days_arg,tuple):
+    elif isinstance(days_arg,tuple) or isinstance(days_arg,list):
         days = days_arg
         count = len(days)
+    if count>1:
+        exit("Not works for count>1")
     # filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,day)
     # filepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
     # localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
     # paramiko.util.log_to_file("paramiko.log")
     host, port = "sftp.datashop.livevol.com", 22
+    d = '../data/SPY_2022_CBOE_SRC/'
     transport = paramiko.Transport((host, port))
     username, password = "olrelax_gmail_com", "Hiwiehi0fz1$"
     print('connect...')
@@ -115,16 +118,19 @@ def get_sftp_cboe(month=None,days_arg=None):
         localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
         print('get %s->%s' % (remotepath, localpath))
         sftp.get(remotepath, localpath)
+        system('ls %s|tail -n 5' % d)
     if sftp:
         print('received')
         sftp.close()
     if transport:
         transport.close()
-    d = '../data/SPY_2022_CBOE_SRC/'
     with zipfile.ZipFile(localpath, 'r') as zip_ref:
         zip_ref.extractall(d)
     print('ls:')
-    system('ls %s | grep %s' % (d,filename[:-4]))
+#    d = '../data/SPY_2022_CBOE_SRC/'
+#    system('ls %s | grep %s' % (d,filename[:-4]))
+    system('ls %s|tail -n 5' % d)
+
     print('done')
 def add_weekday(y=None):
     if y is None:
@@ -202,9 +208,15 @@ def process_data(ch,arg_1=None,arg_2=None):
             weekly_c.to_csv('../data/weekly_C.csv',index=False)
     elif ch == 'mlf':
         make_long_file(2020)
+    elif ch == 'ls':
+        deb()
+def deb():
+    d = '../data/SPY_2022_CBOE_SRC/'
+    system('ls %s|tail -n 5' % d)
+
 
 def select_task():
-    process_data('mlf')
+    process_data('ftp',4,1)
 
 if __name__ == '__main__':
     select_task()

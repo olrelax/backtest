@@ -157,6 +157,7 @@ def get_in2exp(param, side, opt_type, i):
     df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
 
     df_in = df.loc[df['days_to_exp'] > 0].copy()
+
     if algo == 'dist':
         dist = -param if opt_type == 'C' else param
         df_in['delta'] = (df_in['underlying_ask_1545'].sub(dist).sub(df_in['strike']).abs() * 10.0)
@@ -174,12 +175,14 @@ def get_in2exp(param, side, opt_type, i):
     m = pd.merge(s, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
         subset=['quote_date', 'expiration'])
     df_in = m[['quote_date', 'expiration', 'strike', 'underlying_bid_1545', 'underlying_ask_1545', 'bid_1545', 'ask_1545']]
+    save(df_in)
     df_out = df.loc[df['quote_date'] == df['expiration']]
     df_out = df_out[['expiration', 'strike', 'underlying_bid_1545', 'underlying_ask_1545', 'bid_1545', 'ask_1545',
                    'underlying_bid_eod', 'underlying_ask_eod', 'bid_eod', 'ask_eod']]
     df_out = df_out.rename(
         columns={'underlying_bid_1545': 'under_bid_1545_out_%d' % i, 'underlying_ask_1545': 'under_ask_1545_out_%d' % i,
                  'bid_1545': 'bid_1545_out_%d' % i, 'ask_1545': 'ask_1545_out_%d' % i})
+    save(df_out)
     df = pd.merge(df_in, df_out, on=['expiration', 'strike'])
     if side == 'S':
         df['margin'] = (df['bid_1545'] - pd.Series(map(get_sold, df['ask_eod'])))
@@ -221,7 +224,7 @@ def backtest(types, sides, params):
     df, df_overpriced = None, None
     for i in range(count):
         df_in2exp = get_in2exp(params[i], sides[i], types[i], i)
-        if i == 0 and premium_limit > 0:
+        if premium_limit is not None and i == 0 and premium_limit > 0:
             df_overpriced = df_in2exp.loc[df_in2exp['bid_in_0'] > premium_limit]
         if not strike_loss_limit == '' and strike_loss_limit is not None and i == 0:
             df_between = get_df_between(df_in2exp, sides[i], types[i], i)
@@ -252,12 +255,12 @@ def backtests():
     global algo, before_date,draw_or_show, start_date, fn, plot_under,strike_loss_limit,premium_limit
     types = ['P', 'P']
     sides = ['S','L']
-    params = [7,8]
+    params = [12]
     algo = 'disc'
     strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2020-01-01'
-    before_date = '2021-01-01'
-    premium_limit = 2.5
+    start_date = '2021-01-01'
+    before_date = '2023-01-01'
+    premium_limit = None
     plot_under = False
     draw_or_show = 'show'
     df = backtest(types, sides, params)
