@@ -98,12 +98,8 @@ def get_sftp_cboe(month=None,days_arg=None):
     elif isinstance(days_arg,tuple) or isinstance(days_arg,list):
         days = days_arg
         count = len(days)
-    if count>1:
-        exit("Not works for count>1")
-    # filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,day)
-    # filepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
-    # localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
-    # paramiko.util.log_to_file("paramiko.log")
+    if count > 1:
+        exit("Does not work for count > 1")
     host, port = "sftp.datashop.livevol.com", 22
     d = '../data/SPY_2022_CBOE_SRC/'
     transport = paramiko.Transport((host, port))
@@ -216,7 +212,7 @@ def deb():
 
 
 def select_task():
-    process_data('ftp',4,1)
+    process_data('mlf')
 
 if __name__ == '__main__':
     select_task()

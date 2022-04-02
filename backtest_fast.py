@@ -175,14 +175,14 @@ def get_in2exp(param, side, opt_type, i):
     m = pd.merge(s, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
         subset=['quote_date', 'expiration'])
     df_in = m[['quote_date', 'expiration', 'strike', 'underlying_bid_1545', 'underlying_ask_1545', 'bid_1545', 'ask_1545']]
-    save(df_in)
+    # save(df_in)
     df_out = df.loc[df['quote_date'] == df['expiration']]
     df_out = df_out[['expiration', 'strike', 'underlying_bid_1545', 'underlying_ask_1545', 'bid_1545', 'ask_1545',
                    'underlying_bid_eod', 'underlying_ask_eod', 'bid_eod', 'ask_eod']]
     df_out = df_out.rename(
         columns={'underlying_bid_1545': 'under_bid_1545_out_%d' % i, 'underlying_ask_1545': 'under_ask_1545_out_%d' % i,
                  'bid_1545': 'bid_1545_out_%d' % i, 'ask_1545': 'ask_1545_out_%d' % i})
-    save(df_out)
+    # save(df_out)
     df = pd.merge(df_in, df_out, on=['expiration', 'strike'])
     if side == 'S':
         df['margin'] = (df['bid_1545'] - pd.Series(map(get_sold, df['ask_eod'])))
