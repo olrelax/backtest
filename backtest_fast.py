@@ -7,11 +7,11 @@ from plot import plot
 # from functions import get_strike_loss
 # draw_or_show, start_year, before_date, fn, plot_under, single_pos_len, \
 #    algo, comm, strike_loss_limit, ylim_bottom, ylim_top
-
+single_pos_len = 0
 from os import system
 
 
-draw_or_show = ''
+# draw_or_show = ''
 start_date = ''
 before_date = ''
 fn = ''
@@ -28,11 +28,6 @@ def show(df, stop=True, ):
     print(df.columns.tolist())
     if stop:
         exit()
-
-
-
-
-
 
 def save_test(df, types, sides, params):
     global fn
@@ -296,7 +291,7 @@ def backtest(types, sides, params):
 
 
 def backtests():
-    global algo, before_date,draw_or_show, start_date, fn,strike_loss_limit,premium_limit
+    global algo, before_date, start_date, fn,strike_loss_limit,premium_limit
     types = ['P', 'P']
     sides = ['S','L']
     params = [3,10]
