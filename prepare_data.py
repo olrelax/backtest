@@ -153,7 +153,7 @@ def get_name(var):
 
 def save(dtf,arg_name=None):
     name = get_name(dtf)[0] if arg_name is None else arg_name
-    dtf.to_csv('../out/%s.csv' % name,index=False)
+    dtf.to_csv('../devel/%s.csv' % name,index=False)
 
 def loc_weekly_exp_spy_cboe(y,t,exact=True):
     o = read_opt(y,t)
@@ -165,10 +165,23 @@ def loc_weekly_exp_spy_cboe(y,t,exact=True):
         qd8 = d.loc[((d['days_to_exp'] == 0) | (d['days_to_exp'] == 7)) & ((d['weekday'] == 1) | (d['weekday'] == 3) | (d['weekday'] == 5))]
     else:
         qd8 = d.loc[(d['days_to_exp'] == 0) | (d['days_to_exp'] == 7) | ((d['days_to_exp'] == 6) & d['weekday'] == 2) | ((d['days_to_exp'] == 8) & (d['weekday'] == 1))]
+
+    # select list of expiration dates:
     d_exp = qd8[['expiration']].drop_duplicates(subset=['expiration'])
+    # remove expirations for which datafile for date of expiration doesn't exist:
     dm = d_exp.merge(qd8,left_on='expiration',right_on='quote_date').drop(columns='expiration_x').rename(columns={'expiration_y':'expiration'})
     print('%d%s done' % (y,t))
     return dm
+
+
+def loc_mon_fri(y,t):
+    o = read_opt(y,t)
+    o['quote_date'] = pd.to_datetime(o['quote_date'])
+    o['expiration'] = pd.to_datetime(o['expiration'])
+    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
+    d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == 4) & (d['weekday'] == 1))]
+    print('%d%s done' % (y,t))
+    return d
 
 def make_long_file(start_year):
     df_all = None
@@ -188,20 +201,18 @@ def process_data(ch,arg_1=None,arg_2=None):
     elif ch == 'ftp':
         get_sftp_cboe(month=arg_1,days_arg=arg_2)
     elif ch == 'lwe':
-        what = 'all_years'
-        if what == 'all_years':
-            w = loc_weekly_exp_spy_cboe(2018,'P')
-            w = w.append(loc_weekly_exp_spy_cboe(2019,'P'),ignore_index=True)
-            w = w.append(loc_weekly_exp_spy_cboe(2020,'P'),ignore_index=True)
-            w = w.append(loc_weekly_exp_spy_cboe(2021,'P'),ignore_index=True)
-            weekly_p = w.append(loc_weekly_exp_spy_cboe(2022,'P'),ignore_index=True)
-            weekly_p.to_csv('../data/weekly_P.csv',index=False)
-            w = loc_weekly_exp_spy_cboe(2018,'C')
-            w = w.append(loc_weekly_exp_spy_cboe(2019,'C'),ignore_index=True)
-            w = w.append(loc_weekly_exp_spy_cboe(2020,'C'),ignore_index=True)
-            w = w.append(loc_weekly_exp_spy_cboe(2021,'C'),ignore_index=True)
-            weekly_c = w.append(loc_weekly_exp_spy_cboe(2022,'C'),ignore_index=True)
-            weekly_c.to_csv('../data/weekly_C.csv',index=False)
+        if arg_1 is None:
+            fun = loc_weekly_exp_spy_cboe
+            fn = '../data/weekly_P.csv'
+        else:
+            fun = loc_mon_fri
+            fn = '../data/mon_fri_P.csv'
+        w = fun(2020,'P')
+        w = w.append(fun(2021,'P'),ignore_index=True)
+        weekly_p = w.append(fun(2022,'P'),ignore_index=True)
+        # weekly_p = w
+        weekly_p.to_csv(fn,index=False)
+
     elif ch == 'mlf':
         make_long_file(2020)
     elif ch == 'ls':
@@ -212,7 +223,7 @@ def deb():
 
 
 def select_task():
-    process_data('mlf')
+    process_data('lwe',4)
 
 if __name__ == '__main__':
     select_task()

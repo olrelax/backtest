@@ -61,7 +61,7 @@ def plot(df, types, sides, params):
     ax.set_xticks(xtick, minor=True)
     ax.grid('on', which='minor')
     ax.grid('on', which='major')
-    ax.set_ylim(ylim_bottom, ylim_top)
+    #ax.set_ylim(ylim_bottom, ylim_top)
     plt.savefig('../out/c-%s.png' % fn)
 
     if draw_or_show == 'draw':
@@ -147,6 +147,10 @@ def get_df_between(df_in2exp,side,tp,i):
     return df_between
 
 
+
+
+
+
 def get_in2exp(param, side, opt_type, i):
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
@@ -216,6 +220,87 @@ def get_in2exp(param, side, opt_type, i):
     cols.insert(2, 'enter_date')
     df = df[cols]
     return df
+def make_delta_column(df_in,param):
+    if algo == 'dist':
+        dist = param
+        df_in['delta'] = (df_in['underlying_ask_1545'].sub(dist).sub(df_in['strike']).abs() * 10.0)
+    elif algo == 'disc':
+        disc = param
+        k = (100 - disc) / 100
+        df_in['delta'] = (df_in['underlying_ask_1545'] * k - df_in['strike']).abs() * 10.0
+    elif algo == 'price':
+        df_in['delta'] = df_in['bid_1545'].sub(param).abs() * 100
+    else:
+        exit('algo?')
+    df_in['delta'] = df_in['delta'].astype(int)
+    return df_in
+def numerate(df,i):
+    df = df.rename(columns={'strike': 'strike_%d' % i, 'underlying_bid_1545': 'under_bid_in_%d' % i,
+                          'underlying_ask_1545': 'under_ask_in_%d' % i,
+                          'bid_1545': 'bid_in_%d' % i, 'ask_1545': 'ask_in_%d' % i,
+                          'underlying_bid_eod': 'under_bid_out_%d' % i,
+                          'underlying_ask_eod': 'under_ask_out_%d' % i, 'bid_eod': 'bid_out_%d' % i,
+                          'ask_eod': 'ask_out_%d' % i,
+                          'margin': 'margin_%d' % i})
+    return df
+
+def get_in2exp_mf(param, side, i):
+    bd = datetime.strptime(start_date, '%Y-%m-%d')
+    ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
+    opts_fn = '../data/mon_fri_P.csv'
+    df = pd.read_csv(opts_fn)
+    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
+    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+    df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
+
+    df_in = df.loc[df['days_to_exp'] > 0].copy()
+    df_in = make_delta_column(df_in,param)
+    min_delta_series = df_in.groupby(['expiration'])['delta'].min()
+    df_min_delta = min_delta_series.to_frame()
+    df_in_filtered = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
+        subset=['quote_date', 'expiration'])
+    df_in = df_in_filtered[['quote_date', 'expiration', 'strike', 'underlying_bid_1545', 'underlying_ask_1545', 'bid_1545', 'ask_1545']]
+
+
+    df_out = df.loc[df['quote_date'] == df['expiration']]
+    df_out = df_out[['expiration', 'strike', 'underlying_bid_1545', 'underlying_ask_1545', 'bid_1545', 'ask_1545',
+                   'underlying_bid_eod', 'underlying_ask_eod', 'bid_eod', 'ask_eod']]
+    df_out = df_out.rename(
+        columns={'underlying_bid_1545': 'under_bid_1545_out_%d' % i, 'underlying_ask_1545': 'under_ask_1545_out_%d' % i,
+                 'bid_1545': 'bid_1545_out_%d' % i, 'ask_1545': 'ask_1545_out_%d' % i})
+    df = pd.merge(df_in, df_out, on=['expiration', 'strike'])
+    if side == 'S':
+        df['margin'] = (df['bid_1545'] - pd.Series(map(get_sold, df['ask_eod'])))
+    else:
+        df['margin'] = (pd.Series(map(get_sold, df['bid_eod'])) - df['ask_1545'])
+    df = numerate(df,i)
+    df['exit_date'] = df['expiration']
+    cols = df.columns.tolist()
+    cols.insert(2, 'exit_date')
+    cols.pop(-1)
+    df['enter_date'] = df['quote_date']
+    cols.insert(2, 'enter_date')
+    df = df[cols]
+    return df
+def bt_mon_fri(sides,params):
+    global single_pos_len
+    count = min(len(sides), len(params))
+    df = None
+    for i in range(count):
+        df_in2exp = get_in2exp_mf(params[i], sides[i], i)
+        df_cont = df_in2exp
+        df_cont = df_cont.sort_values(['exit_date', 'enter_date'])
+        single_pos_len = df_cont.shape[1] - 1 if i == 0 else single_pos_len
+        df = df_cont if i == 0 else pd.merge(df, df_cont, on=['exit_date', 'enter_date'], how='outer')
+    df = df.rename(columns={'quote_date_x':'quote_date','expiration_x':'expiration'})
+    df = df.sort_values(['exit_date', 'enter_date'])
+
+    for i in range(count):
+        df['sum_%d' % i] = df['margin_%d' % i].cumsum(axis=0)
+        df['sum_%d' % i] = df['sum_%d' % i].fillna(method='ffill')
+    for i in range(count):
+        df['sum'] = df['sum_%d' % i] if i == 0 else df['sum'] + df['sum_%d' % i]
+    return df
 
 
 def backtest(types, sides, params):
@@ -234,8 +319,6 @@ def backtest(types, sides, params):
         else:
             df_cont = df_in2exp
         df_cont = df_cont.sort_values(['exit_date', 'enter_date'])
-#        df_cont['sum_%d' % i] = df_cont['margin_%d' % i].cumsum(axis=0)
-#        save(df_cont)
         single_pos_len = df_cont.shape[1] - 1 if i == 0 else single_pos_len
 
         df = df_cont if i == 0 else pd.merge(df, df_cont, on=['exit_date', 'enter_date'], how='outer')
@@ -255,15 +338,15 @@ def backtests():
     global algo, before_date,draw_or_show, start_date, fn, plot_under,strike_loss_limit,premium_limit
     types = ['P', 'P']
     sides = ['S','L']
-    params = [12]
+    params = [3,10]
     algo = 'disc'
     strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2021-01-01'
+    start_date = '2020-01-01'
     before_date = '2023-01-01'
     premium_limit = None
     plot_under = False
     draw_or_show = 'show'
-    df = backtest(types, sides, params)
+    df = bt_mon_fri(sides, params)
 
     save_test(df, types, sides, params)
     plot(df, types, sides, params)

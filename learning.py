@@ -5,21 +5,10 @@ import numpy as np
 import csv
 
 
-def fun(a):
-    return 2 * a
-
-
-class Cl:
-    a = 0
-
-    def center(self):
-        self.a = 3
-
-
-def locd():
-    c = Cl()
-    print(c.center)
-
-
+def isin():
+    df1 = pd.DataFrame({'col1':[1,2,3,4],'col2':['a1','b1','c1','d1']})
+    df2 = pd.DataFrame({'col1':[11,2,3,44],'col2':['aa2','b2','c2','dd2']})
+    df1_in_d2 = df1.loc[df1['col1'].isin(df2['col1'])]
+    print(df1_in_d2)
 if __name__ == '__main__':
-    locd()
+    isin()
