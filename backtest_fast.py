@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import inspect
 from au import read_opt_file
+from plot import plot
 # from functions import get_strike_loss
 # draw_or_show, start_year, before_date, fn, plot_under, single_pos_len, \
 #    algo, comm, strike_loss_limit, ylim_bottom, ylim_top
@@ -14,13 +15,9 @@ draw_or_show = ''
 start_date = ''
 before_date = ''
 fn = ''
-plot_under = None
-single_pos_len = 0
 algo = ''
 comm = 0
 strike_loss_limit = -100
-ylim_bottom = -100
-ylim_top = 100
 premium_limit = 0
 
 
@@ -33,44 +30,8 @@ def show(df, stop=True, ):
         exit()
 
 
-def normalize(df):
-    opt_min = df[['sum_1', 'sum_2', 'sum']].to_numpy().min()
-    opt_max = df[['sum_1', 'sum_2', 'sum']].to_numpy().max()
-    under_min = df['under_1_out'].to_numpy().min()
-    under_max = df['under_1_out'].to_numpy().max()
-    df['under_1_out'] = df['under_1_out'] * (opt_max - opt_min) / (under_max - under_min)
-    under_min = df['under_1_out'].to_numpy().min()
-    df['under_1_out'] = df['under_1_out'] - under_min + opt_min
-    return df
 
 
-def plot(df, types, sides, params):
-    count = int(df.shape[1] / single_pos_len)
-    if count == 1:
-        dfp = df[['exit_date', 'sum_0']]
-    else:
-        cols = 'exit_date,'
-        for i in range(count):
-            cols = cols + 'sum_%d,' % i
-        cols = cols + 'sum'
-        dfp = df[cols.split(',')]
-    dfp = dfp.set_index('exit_date')
-    txt = '{}, type {}, side {},param {},\n str_loss_lim {}, premium_lim {}'.format(algo, types, sides, params, strike_loss_limit,premium_limit)
-    ax = dfp.plot(figsize=(11, 7), title=txt)
-    xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')
-    ax.set_xticks(xtick, minor=True)
-    ax.grid('on', which='minor')
-    ax.grid('on', which='major')
-    #ax.set_ylim(ylim_bottom, ylim_top)
-    plt.savefig('../out/c-%s.png' % fn)
-
-    if draw_or_show == 'draw':
-        plt.draw()
-    else:
-        plt.show()
-    plt.pause(0.0001)
-    if draw_or_show == 'draw':
-        plt.close()
 
 
 def save_test(df, types, sides, params):
@@ -335,7 +296,7 @@ def backtest(types, sides, params):
 
 
 def backtests():
-    global algo, before_date,draw_or_show, start_date, fn, plot_under,strike_loss_limit,premium_limit
+    global algo, before_date,draw_or_show, start_date, fn,strike_loss_limit,premium_limit
     types = ['P', 'P']
     sides = ['S','L']
     params = [3,10]
@@ -344,12 +305,13 @@ def backtests():
     start_date = '2020-01-01'
     before_date = '2023-01-01'
     premium_limit = None
-    plot_under = False
     draw_or_show = 'show'
     df = bt_mon_fri(sides, params)
 
     save_test(df, types, sides, params)
-    plot(df, types, sides, params)
+    lines_count = int(df.shape[1] / single_pos_len)
+    txt = '{}, type {}, side {},param {},\n str_loss_lim {}, premium_lim {}'.format(algo, types, sides, params, strike_loss_limit,premium_limit)
+    plot(df,txt,lines_count=lines_count,draw_or_show=draw_or_show,fn=fn)
     if draw_or_show == 'draw':
         input('pause >')
 

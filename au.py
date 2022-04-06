@@ -23,6 +23,15 @@ def read_opt_file(ofn):
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     return df
+def normalize(df):
+    opt_min = df[['sum_1', 'sum_2', 'sum']].to_numpy().min()
+    opt_max = df[['sum_1', 'sum_2', 'sum']].to_numpy().max()
+    under_min = df['under_1_out'].to_numpy().min()
+    under_max = df['under_1_out'].to_numpy().max()
+    df['under_1_out'] = df['under_1_out'] * (opt_max - opt_min) / (under_max - under_min)
+    under_min = df['under_1_out'].to_numpy().min()
+    df['under_1_out'] = df['under_1_out'] - under_min + opt_min
+    return df
 
 
 def fl(arg):
