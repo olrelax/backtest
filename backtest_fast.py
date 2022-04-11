@@ -4,19 +4,12 @@ from datetime import datetime
 import inspect
 from au import read_opt_file
 from plot import plot
-# from functions import get_strike_loss
-# draw_or_show, start_year, before_date, fn, plot_under, single_pos_len, \
-#    algo, comm, strike_loss_limit, ylim_bottom, ylim_top
 single_pos_len = 0
-from os import system
 
-
-# draw_or_show = ''
 start_date = ''
 before_date = ''
 fn = ''
 algo = ''
-comm = 0
 strike_loss_limit = -100
 premium_limit = 0
 
@@ -294,19 +287,23 @@ def backtests():
     global algo, before_date, start_date, fn,strike_loss_limit,premium_limit
     types = ['P', 'P']
     sides = ['S','L']
-    params = [3,10]
+    params = [7,]
     algo = 'disc'
     strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2020-01-01'
+    start_date = '2018-01-01'
     before_date = '2023-01-01'
     premium_limit = None
     draw_or_show = 'show'
     df = bt_mon_fri(sides, params)
 
     save_test(df, types, sides, params)
-    lines_count = int(df.shape[1] / single_pos_len)
-    txt = '{}, type {}, side {},param {},\n str_loss_lim {}, premium_lim {}'.format(algo, types, sides, params, strike_loss_limit,premium_limit)
-    plot(df,txt,lines_count=lines_count,draw_or_show=draw_or_show,fn=fn)
+    lines_in_plot = int(df.shape[1] / single_pos_len)
+    trades = len(df)
+    comm = 0.015
+    commission = comm * trades
+    txt = '{}, type {}, side {},param {},\n str_loss_lim {}, premium_lim {}\ntrades {}, comm({}) {}'\
+        .format(algo, types, sides, params, strike_loss_limit,premium_limit,trades,comm,commission)
+    plot(df,txt,lines_count=lines_in_plot,draw_or_show=draw_or_show,fn=fn)
     if draw_or_show == 'draw':
         input('pause >')
 

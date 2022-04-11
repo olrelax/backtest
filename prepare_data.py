@@ -111,7 +111,7 @@ def get_sftp_cboe(month=None,days_arg=None):
     for i in range(count):
         filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,days[i])
         remotepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
-        localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/OptionsBacktest/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
+        localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
         print('get %s->%s' % (remotepath, localpath))
         sftp.get(remotepath, localpath)
         system('ls %s|tail -n 5' % d)
@@ -201,13 +201,15 @@ def process_data(ch,arg_1=None,arg_2=None):
     elif ch == 'ftp':
         get_sftp_cboe(month=arg_1,days_arg=arg_2)
     elif ch == 'lwe':
-        if arg_1 is None:
+        if arg_1 == 7:
             fun = loc_weekly_exp_spy_cboe
             fn = '../data/weekly_P.csv'
         else:
             fun = loc_mon_fri
             fn = '../data/mon_fri_P.csv'
-        w = fun(2020,'P')
+        w = fun(2018,'P')
+        w = w.append(fun(2019,'P'),ignore_index=True)
+        w = w.append(fun(2020,'P'),ignore_index=True)
         w = w.append(fun(2021,'P'),ignore_index=True)
         weekly_p = w.append(fun(2022,'P'),ignore_index=True)
         # weekly_p = w
@@ -223,7 +225,8 @@ def deb():
 
 
 def select_task():
-    process_data('lwe',4)
+    # 'ftp', 'r',('lwe')
+    process_data('lwe')
 
 if __name__ == '__main__':
     select_task()
