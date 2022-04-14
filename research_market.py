@@ -1,10 +1,23 @@
 import pandas as pd
 from dateutil.relativedelta import *
 import mplfinance as mpf
+import inspect
 from au import *
 def add_days(dt):
     return dt + relativedelta(days=7)
 days_to_add = 5
+
+def get_name(var):
+    callers_local_vars = inspect.currentframe().f_back.f_back.f_locals.items()
+    return [var_name for var_name, var_val in callers_local_vars if var_val is var]
+
+def save(dtf,arg_name=None,stop=False):
+    name = get_name(dtf)[0] if arg_name is None else arg_name
+    print('save',name)
+    dtf.to_csv('../devel/%s.csv' % name,index=True)
+    if stop:
+        exit()
+
 def analyze_option():
     date = s2d('2020-02-26')
     exp = s2d('2020-03-04')
@@ -63,29 +76,32 @@ def comp_pattern():
 def add_wd(dt):
     return add_work_days(dt,days_to_add)
 
-def max_week_move(tick,work_days,n):
+def max_week_move(tick,expire_in=4,enter_weekday=1,show_rows=5):
     global days_to_add
-    days_to_add = work_days
+    days_to_add = expire_in
     df = pd.read_csv('../data/%s-yahoo.csv' % tick)
     df['Date'] = pd.to_datetime(df['Date'])
-    df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))
+    df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
     df['late'] = pd.Series(map(add_wd,df['Date']))
     df_left = df[['Date','Close','wkd','late']]
     df_right = df[['Date','Close','wkd']]
     df1 = pd.merge(df_left,df_right,left_on='late',right_on='Date')
+    df1 = df1.loc[df1['wkd_x'] == enter_weekday]
+
     df1['delta'] = df1['Close_x'] - df1['Close_y']
+    df1 = df1.loc[df1.Date_x > s2d('2009-05-04')].reset_index(drop=True)
     df1['wkd_x'] = pd.Series(map(str,df1['wkd_x']))
     df1['wkd_y'] = pd.Series(map(str,df1['wkd_y']))
     df1['wkd'] = df1['wkd_x'] + df1['wkd_y']
     df1['delta_prc'] = 100*(df1['delta'])/df1['Close_x']
     df1 = df1[['Date_x','Close_x','Date_y','Close_y','wkd','delta','delta_prc']]
-    down = df1.iloc[df1['delta_prc'].argsort()][-n:]
-    up = (df1.iloc[df1['delta_prc'].argsort()][:n])
+    down = df1.iloc[df1['delta_prc'].argsort()][-show_rows:]
+    up = (df1.iloc[df1['delta_prc'].argsort()][:show_rows])
     up['delta'] = (up['delta'] * -1)
     up['delta_prc'] = (up['delta_prc'] * -1)
     up = up.sort_values('delta')
-    print(up)
-    print(down)
+    # print('-------------------- UP ----------------------------\n',up)
+    print('-------------------- DOWN --------------------------\n',down)
 
 if __name__ == '__main__':
-    analyze_option()
+    max_week_move(tick='QQQ',expire_in=4,enter_weekday=1,show_rows=10)

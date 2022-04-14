@@ -2,7 +2,7 @@ import pandas as pd
 from os import walk
 from dateutil.relativedelta import *
 from datetime import datetime
-from au import s2d, d2s,prn,add_days,read_opt
+from au import add_days,read_opt
 from os import system
 import time
 import urllib.request
@@ -13,10 +13,10 @@ import paramiko
 import zipfile
 import inspect
 
-def process_cboe_source_do(year, option_type):
+def process_cboe_source_do(ticker,year, option_type):
     i = 0
     f = []
-    d = '../data/SPY_%s_CBOE_SRC/' % year
+    d = '../data/%s_%s_CBOE_SRC/' % (ticker,year)
     for (path, names, filenames) in walk(d):
         f.extend(filenames)
         break
@@ -40,18 +40,14 @@ def process_cboe_source_do(year, option_type):
         else:
             rf = rf.append(df.copy())
         i += 1
-    fn = '../data/SPY_CBOE_%s_%s.csv' % (year,option_type)
+    fn = '../data/%s_CBOE_%s_%s.csv' % (ticker,year,option_type)
     rf.reset_index(drop=True).to_csv(fn)
     print('saved %s' % fn)
-def process_cboe_source(year=None,option_type=None):
+def process_cboe_source(ticker,year=None,option_type=None):
     if year is None and option_type is None:
-        process_cboe_source_do(2022,'P')
-        process_cboe_source_do(2022,'C')
+        process_cboe_source_do(ticker,2022,'P')
+        process_cboe_source_do(ticker,2022,'C')
 
-def debug():
-    df = pd.read_csv('../data/SPY_CBOE_2020_P.csv')
-    print(df.head())
-    print(df.tail())
 def download_yahoo(bd,ticker):
     ed = datetime.today().strftime('%Y-%m-%d')
     b = time.mktime(datetime.strptime(bd, '%Y-%m-%d').timetuple())
@@ -128,12 +124,12 @@ def get_sftp_cboe(month=None,days_arg=None):
     system('ls %s|tail -n 5' % d)
 
     print('done')
-def add_weekday(y=None):
+def add_weekday(ticker,y=None):
     if y is None:
         y = 2022
 
     def add_weekday_do(year, option_type):
-        fn = '../data/SPY_CBOE_%s_%s.csv' % (year, option_type)
+        fn = '../data/%s_CBOE_%s_%s.csv' % (ticker,year, option_type)
         df = pd.read_csv('../data/%s' % fn)
         df['quote_date'] = pd.to_datetime(df['quote_date'])
         df['expiration'] = pd.to_datetime(df['expiration'])
@@ -155,8 +151,8 @@ def save(dtf,arg_name=None):
     name = get_name(dtf)[0] if arg_name is None else arg_name
     dtf.to_csv('../devel/%s.csv' % name,index=False)
 
-def loc_weekly_exp_spy_cboe(y,t,exact=True):
-    o = read_opt(y,t)
+def loc_weekly_exp_cboe(ticker,y,t,exact=True):
+    o = read_opt(ticker,y,t)
     o['quote_date'] = pd.to_datetime(o['quote_date'])
     o['expiration'] = pd.to_datetime(o['expiration'])
     d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
@@ -174,11 +170,11 @@ def loc_weekly_exp_spy_cboe(y,t,exact=True):
     return dm
 
 
-def loc_mon_fri(y,t):
-    o = read_opt(y,t)
-    o['quote_date'] = pd.to_datetime(o['quote_date'])
-    o['expiration'] = pd.to_datetime(o['expiration'])
-    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
+def loc_mon_fri(ticker,y,t):
+    o = read_opt(ticker,y,t)
+    # o['quote_date'] = pd.to_datetime(o['quote_date'])
+    # o['expiration'] = pd.to_datetime(o['expiration'])
+    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','high','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
     d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == 4) & (d['weekday'] == 1))]
     print('%d%s done' % (y,t))
     return d
@@ -194,25 +190,26 @@ def make_long_file(start_year):
 
 def process_data(ch,arg_1=None,arg_2=None):
     if ch == 'y':
-        download_yahoo('2007-01-01','SPY')
+        download_yahoo('2007-01-01',arg_1)
     elif ch == 'r':
-        process_cboe_source()
-        add_weekday()
+        process_cboe_source(ticker=arg_1,year=arg_2)
+        add_weekday(ticker=arg_1,y=arg_2)
     elif ch == 'ftp':
         get_sftp_cboe(month=arg_1,days_arg=arg_2)
     elif ch == 'lwe':
-        if arg_1 == 7:
-            fun = loc_weekly_exp_spy_cboe
+        ticker = arg_1
+        if arg_2 == 7:
+            fun = loc_weekly_exp_cboe
             fn = '../data/weekly_P.csv'
         else:
             fun = loc_mon_fri
-            fn = '../data/mon_fri_P.csv'
-        w = fun(2018,'P')
-        w = w.append(fun(2019,'P'),ignore_index=True)
-        w = w.append(fun(2020,'P'),ignore_index=True)
-        w = w.append(fun(2021,'P'),ignore_index=True)
-        weekly_p = w.append(fun(2022,'P'),ignore_index=True)
-        # weekly_p = w
+            fn = '../data/%s_mon_fri_P.csv' % ticker
+        # w = fun(2018,'P')
+        #w = w.append(fun(2019,'P'),ignore_index=True)
+        #w = w.append(fun(2020,'P'),ignore_index=True)
+        #w = w.append(fun(2021,'P'),ignore_index=True)
+        # weekly_p = w.append(fun(2022,'P'),ignore_index=True)
+        weekly_p = fun(ticker=arg_1,y=2022,t='P')
         weekly_p.to_csv(fn,index=False)
 
     elif ch == 'mlf':
@@ -225,8 +222,8 @@ def deb():
 
 
 def select_task():
-    # 'ftp', 'r',('lwe')
-    process_data('lwe')
+    # 'ftp', ('r','QQQ',2022),('lwe','QQQ')
+    process_data('lwe','QQQ')
 
 if __name__ == '__main__':
     select_task()

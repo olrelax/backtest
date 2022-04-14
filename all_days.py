@@ -5,7 +5,7 @@ import inspect
 from au import read_opt_file
 from plot import plot
 single_pos_len = 0
-
+ticker = ''
 start_date = ''
 before_date = ''
 fn = ''
@@ -136,7 +136,7 @@ def get_in2exp(param, side, opt_type, i):
         columns={'underlying_bid_1545': 'under_bid_1545_out_%d' % i, 'underlying_ask_1545': 'under_ask_1545_out_%d' % i,
                  'bid_1545': 'bid_1545_out_%d' % i, 'ask_1545': 'ask_1545_out_%d' % i})
     # save(df_out)
-    df = pd.merge(df_in, df_out, on=['expiration', 'strike'])
+    df = pd.merge(df_in, df_out, on=['expiration', 'strike']).reset_index(drop=True)
     if side == 'S':
         df['margin'] = (df['bid_1545'] - pd.Series(map(get_sold, df['ask_eod'])))
     else:
@@ -196,7 +196,7 @@ def numerate(df,i):
 def get_in2exp_mf(param, side, i):
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
-    opts_fn = '../data/mon_fri_P.csv'
+    opts_fn = '../data/%s_mon_fri_P.csv' % ticker
     df = pd.read_csv(opts_fn)
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
@@ -217,7 +217,7 @@ def get_in2exp_mf(param, side, i):
     df_out = df_out.rename(
         columns={'underlying_bid_1545': 'under_bid_1545_out_%d' % i, 'underlying_ask_1545': 'under_ask_1545_out_%d' % i,
                  'bid_1545': 'bid_1545_out_%d' % i, 'ask_1545': 'ask_1545_out_%d' % i})
-    df = pd.merge(df_in, df_out, on=['expiration', 'strike'])
+    df = pd.merge(df_in, df_out, on=['expiration', 'strike']).reset_index(drop=True)
     if side == 'S':
         df['margin'] = (df['bid_1545'] - pd.Series(map(get_sold, df['ask_eod'])))
     else:
@@ -284,13 +284,14 @@ def backtest(types, sides, params):
 
 
 def backtests():
-    global algo, before_date, start_date, fn,strike_loss_limit,premium_limit
+    global algo, before_date, start_date, fn,strike_loss_limit,premium_limit,ticker
+    ticker = 'QQQ'
     types = ['P', 'P']
     sides = ['S','L']
-    params = [7,]
+    params = [9,]
     algo = 'disc'
     strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2018-01-01'
+    start_date = '2022-01-01'
     before_date = '2023-01-01'
     premium_limit = None
     draw_or_show = 'show'
@@ -299,7 +300,7 @@ def backtests():
     save_test(df, types, sides, params)
     lines_in_plot = int(df.shape[1] / single_pos_len)
     trades = len(df)
-    comm = 0.015
+    comm = 0.0105
     commission = comm * trades
     txt = '{}, type {}, side {},param {},\n str_loss_lim {}, premium_lim {}\ntrades {}, comm({}) {}'\
         .format(algo, types, sides, params, strike_loss_limit,premium_limit,trades,comm,commission)

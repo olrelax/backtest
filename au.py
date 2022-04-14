@@ -46,8 +46,8 @@ def read_stock():
     stock = stock_1[stock_1['date'] >= start_date].copy().reset_index(drop=True)
     return stock
 
-def read_opt(year,opt_type):
-    fn = '../data/SPY_CBOE_%d_%s.csv' % (year,opt_type)
+def read_opt(ticker,year,opt_type):
+    fn = '../data/%s_CBOE_%d_%s.csv' % (ticker,year,opt_type)
     try:
         opts = pd.read_csv(fn, index_col=0)
     except FileNotFoundError:
