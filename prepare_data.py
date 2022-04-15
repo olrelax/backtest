@@ -203,7 +203,7 @@ def process_data(ch,arg_1=None,arg_2=None):
             fn = '../data/weekly_P.csv'
         else:
             fun = loc_mon_fri
-            fn = '../data/%s_mon_fri_P.csv' % ticker
+            fn = '../data/%s/%s_mon_fri_P.csv' % (ticker,ticker)
         # w = fun(2018,'P')
         #w = w.append(fun(2019,'P'),ignore_index=True)
         #w = w.append(fun(2020,'P'),ignore_index=True)
@@ -223,7 +223,7 @@ def deb():
 
 def select_task():
     # 'ftp', ('r','QQQ',2022),('lwe','QQQ')
-    process_data('lwe','QQQ')
+    process_data('lwe','SPY')
 
 if __name__ == '__main__':
     select_task()

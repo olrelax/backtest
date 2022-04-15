@@ -47,7 +47,7 @@ def read_stock():
     return stock
 
 def read_opt(ticker,year,opt_type):
-    fn = '../data/%s_CBOE_%d_%s.csv' % (ticker,year,opt_type)
+    fn = '../data/%s/%s_CBOE_%d_%s.csv' % (ticker,ticker,year,opt_type)
     try:
         opts = pd.read_csv(fn, index_col=0)
     except FileNotFoundError:

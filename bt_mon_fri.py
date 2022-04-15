@@ -11,7 +11,7 @@ algo = ''
 strike_loss_limit = -100
 premium_limit = 0
 enter_time = '1545'
-
+comm = 0
 def show(df, stop=True, ):
     name = get_name(df)[0]
     print('-----------------%s------------' % name)
@@ -64,7 +64,7 @@ def numerate(df,i):
                           'underlying_bid_eod': 'under_bid_out_%d' % i,
                           'underlying_ask_eod': 'under_ask_out_%d' % i, 'bid_eod': 'bid_out_%d' % i,
                           'ask_eod': 'ask_out_%d' % i,
-                          'margin': 'margin_%d' % i})
+                          'margin': 'margin_%d' % i,'profit': 'profit_%d' % i})
     return df
 
 def get_in2exp_mf(param, side, i):
@@ -92,12 +92,13 @@ def get_in2exp_mf(param, side, i):
         columns={'underlying_bid_1545': 'under_bid_1545_out_%d' % i, 'underlying_ask_1545': 'under_ask_1545_out_%d' % i,
                  'high':'high_%d' % i,'bid_1545': 'bid_1545_out_%d' % i, 'ask_1545': 'ask_1545_out_%d' % i})
     df = pd.merge(df_in, df_out, on=['expiration', 'strike']).reset_index(drop=True)
-    enter_short = 'bid_1545' if enter_time == '1545' else 'high'
+    enter_short = 'bid_1545' if enter_time == '1545' else 'high' if enter_time == 'high' else exit('wrong enter_time')
     enter_long = 'ask_1545' if enter_time == '1545' else 'high'
     if side == 'S':
         df['margin'] = (df[enter_short] - pd.Series(map(get_sold, df['ask_eod'])))
     else:
         df['margin'] = (pd.Series(map(get_sold, df['bid_eod'])) - df[enter_long])
+    df['profit'] = df['margin'].sub(comm)
     df = numerate(df,i)
     df['exit_date'] = df['expiration']
     cols = df.columns.tolist()
@@ -120,7 +121,7 @@ def bt_mon_fri(sides,params):
     df = df.sort_values(['exit_date', 'enter_date'])
 
     for i in range(count):
-        df['sum_%d' % i] = df['margin_%d' % i].cumsum(axis=0)
+        df['sum_%d' % i] = df['profit_%d' % i].cumsum(axis=0)
         df['sum_%d' % i] = df['sum_%d' % i].fillna(method='ffill')
     for i in range(count):
         df['sum'] = df['sum_%d' % i] if i == 0 else df['sum'] + df['sum_%d' % i]
@@ -128,26 +129,29 @@ def bt_mon_fri(sides,params):
 
 
 def backtests():
-    global algo, before_date, start_date, fn,strike_loss_limit,premium_limit,ticker,enter_time
+    global algo, before_date, start_date, fn,strike_loss_limit,premium_limit,ticker,enter_time,comm
+
     ticker = 'QQQ'
     types = ['P', 'P']
     sides = ['S','L']
-    params = [9,12]
+    params = [10]
     algo = 'disc'
-    enter_time = '154'
+    enter_time = 'high'
     strike_loss_limit = None  # in USD if > 1 else in %
     start_date = '2022-01-01'
     before_date = '2023-01-01'
     premium_limit = None
     draw_or_show = 'show'
-    df = bt_mon_fri(sides, params)
+    comm = 0.0105
 
+    df = bt_mon_fri(sides, params)
     save_test(df, types, sides, params)
     lines_in_plot = int(df.shape[1] / single_pos_len)
     trades = len(df)
-    comm = 0.0105
-    txt = '{}, type {}, side {},param {},\n str_loss_lim {}, premium_lim {}\ntrades {}, comm {}'\
-        .format(algo, types, sides, params, strike_loss_limit,premium_limit,trades,comm)
+    summa = df['sum'].iloc[-1]
+    avg = summa / trades
+    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f'\
+        .format(ticker, algo, types, sides, params, trades) % (summa,avg)
     plot(df,txt,lines_count=lines_in_plot,draw_or_show=draw_or_show,fn=fn)
     if draw_or_show == 'draw':
         input('pause >')
