@@ -52,7 +52,7 @@ def download_yahoo(bd,ticker):
     ed = datetime.today().strftime('%Y-%m-%d')
     b = time.mktime(datetime.strptime(bd, '%Y-%m-%d').timetuple())
     e = time.mktime(datetime.strptime(ed, '%Y-%m-%d').timetuple())
-    fn = '../data/%s-yahoo.csv' % ticker
+    fn = '../data/%s/%s-yahoo.csv' % (ticker,ticker)
     url = 'https://query1.finance.yahoo.com/v7/finance/download/%s?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true' % (ticker,b,e)
     try:
         with urllib.request.urlopen(url,context=ssl.SSLContext()) as f:
@@ -172,9 +172,7 @@ def loc_weekly_exp_cboe(ticker,y,t,exact=True):
 
 def loc_mon_fri(ticker,y,t):
     o = read_opt(ticker,y,t)
-    # o['quote_date'] = pd.to_datetime(o['quote_date'])
-    # o['expiration'] = pd.to_datetime(o['expiration'])
-    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','high','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
+    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
     d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == 4) & (d['weekday'] == 1))]
     print('%d%s done' % (y,t))
     return d
@@ -187,7 +185,14 @@ def make_long_file(start_year):
         df_all = y_opts if step == 0 else df_all.append(y_opts,ignore_index=True)
     # df_all['pair_all'] = df_all['quote_date'].astype(str) + df_all['expiration'].astype(str)
     df_all.to_csv('../data/SPY_CBOE_%d-2022_P.csv' % start_year)
-
+def join_stock(df,ticker):
+    sfn = '../data/%s/%s-yahoo.csv' % (ticker,ticker)
+    ofn = '../data/%s/%s_mon_fri_P.csv' % (ticker,ticker)
+    stock = pd.read_csv(sfn,parse_dates=['Date'])[['Date','Open','High','Low','Close']].rename(columns={'Date':'quote_date'})
+    opt = pd.read_csv(ofn,parse_dates=['quote_date']) if df is None else df
+    df = pd.merge(opt,stock,on='quote_date').rename(columns={'Open':'underlying_open','High':'underlying_high','Low':'underlying_low','Close':'underlying_close'})
+    'Open	High	Low	Close'
+    return df
 def process_data(ch,arg_1=None,arg_2=None):
     if ch == 'y':
         download_yahoo('2007-01-01',arg_1)
@@ -198,19 +203,15 @@ def process_data(ch,arg_1=None,arg_2=None):
         get_sftp_cboe(month=arg_1,days_arg=arg_2)
     elif ch == 'lwe':
         ticker = arg_1
-        if arg_2 == 7:
-            fun = loc_weekly_exp_cboe
-            fn = '../data/weekly_P.csv'
-        else:
-            fun = loc_mon_fri
-            fn = '../data/%s/%s_mon_fri_P.csv' % (ticker,ticker)
-        # w = fun(2018,'P')
-        #w = w.append(fun(2019,'P'),ignore_index=True)
-        #w = w.append(fun(2020,'P'),ignore_index=True)
-        #w = w.append(fun(2021,'P'),ignore_index=True)
-        # weekly_p = w.append(fun(2022,'P'),ignore_index=True)
-        weekly_p = fun(ticker=arg_1,y=2022,t='P')
-        weekly_p.to_csv(fn,index=False)
+        opt_type = arg_2
+        fun = loc_mon_fri
+        fn = '../data/%s/%s_mon_fri_%s.csv' % (ticker,ticker,opt_type)
+        w = fun(ticker=arg_1,y=2020,t=arg_2)
+        w = w.append(fun(ticker=arg_1,y=2021,t=arg_2),ignore_index=True)
+        w = w.append(fun(ticker=arg_1,y=2022,t=arg_2),ignore_index=True)
+        w = join_stock(w,ticker)
+        # noinspection PyTypeChecker
+        w.to_csv(fn,index=False)
 
     elif ch == 'mlf':
         make_long_file(2020)
@@ -222,8 +223,7 @@ def deb():
 
 
 def select_task():
-    # 'ftp', ('r','QQQ',2022),('lwe','QQQ')
-    process_data('lwe','SPY')
+    process_data('lwe','SPY','C')
 
 if __name__ == '__main__':
     select_task()

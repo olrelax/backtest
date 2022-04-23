@@ -49,12 +49,10 @@ def read_stock():
 def read_opt(ticker,year,opt_type):
     fn = '../data/%s/%s_CBOE_%d_%s.csv' % (ticker,ticker,year,opt_type)
     try:
-        opts = pd.read_csv(fn, index_col=0)
+        opts = pd.read_csv(fn, index_col=0,parse_dates=['quote_date','expiration'])
     except FileNotFoundError:
         prn('No such file %s' % fn,'blue')
         return None
-    opts['quote_date'] = pd.to_datetime(opts['quote_date'], format='%Y-%m-%d')
-    opts['expiration'] = pd.to_datetime(opts['expiration'], format='%Y-%m-%d')
     return opts
 
 def ts(date=datetime.now()):
