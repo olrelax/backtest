@@ -21,11 +21,11 @@ def show(df, stop=True):
     if stop:
         exit()
 
-def save_test(df, types, sides, params):
+def save_test(df, types, sides, params,exp_weekday):
     global fn
     fn = datetime.strftime(datetime.now(), '%d-%-H-%M-%S')
     ini = open('../out/i-%s.txt' % fn, 'w')
-    print('type {},sides{},params{}, str_loss_lim {}'.format(types, sides, params, strike_loss_limit), file=ini)
+    print('type {},sides{},params{}, str_loss_lim {},{}'.format(types, sides, params, strike_loss_limit,exp_weekday), file=ini)
     ini.close()
     # noinspection PyTypeChecker
     df.to_csv('../out/e-%s.csv' % fn, index=False)
@@ -55,22 +55,29 @@ def make_delta_column(df_in,opt_type,disc):
     df_in['delta'] = (df_in['underlying_open'] * k - df_in['strike']).abs() * 10.0
     df_in['delta'] = df_in['delta'].astype(int)
     return df_in
+def zero_or_not(diff):
+    return 1. if diff > 0 else 0
 
-def in2exp(param, opt_type,side, i):
+def in2exp(param, weeks,side, i):
 
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
-    opts_fn = '../data/%s/%s_mon_fri_%s.csv' % (ticker,ticker,opt_type[:1])
+    opts_fn = '../data/%s/%s_mon_fri_%d.csv' % (ticker,ticker,weeks)
     df = pd.read_csv(opts_fn,parse_dates=['quote_date','expiration'])
     df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
-    df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,disc=param)
+    df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type='P',disc=param)
     df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
     df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
         subset=['quote_date', 'expiration'])[['quote_date', 'expiration', 'strike', 'underlying_open', 'open']]
-    prefix = 'ask' if side == 'Put' else 'bid'
-    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_close','%s_eod' % prefix]].rename(columns={'%s_eod' % prefix:'out','underlying_close':'under_out'})
+    prefix = 'ask' if side == 'short' else 'bid'
+    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_close','%s_eod' % prefix]].rename(columns={'%s_eod' % prefix:'out_tmp','underlying_close':'under_out'}).copy().reset_index(drop=True)
+    df_out['diff'] = df_out['strike'] - df_out['under_out']
+    df_out['k'] = pd.Series(map(zero_or_not,df_out['diff'])).to_frame()
+    df_out['out'] = df_out['out_tmp'] * df_out['k']
+    # save(df_out,None,True)
     df = pd.merge(df_in, df_out, on=['expiration', 'strike']).reset_index(drop=True)
-    df['margin'] = (df['open'] - pd.Series(map(get_sold, df['out']))) * (1. if side == 'short' else -1.)
+    # df['margin'] = (df['open'] - pd.Series(map(get_sold, df['out']))) * (1. if side == 'short' else -1.)
+    df['margin'] = (df['open'] - df['out']) * (1. if side == 'short' else -1.)
     df['profit'] = df['margin'].sub(comm)
     df = numerate(df,i)
     df['exit_date'] = df['expiration']
@@ -81,12 +88,12 @@ def in2exp(param, opt_type,side, i):
     cols.insert(2, 'enter_date')
     df = df[cols]
     return df
-def bt_mon_fri(types,sides,params):
+def backtest(sides,params,weeks):
     global count, single_pos_len
     count = min(len(sides), len(params))
     df = None
     for i in range(count):
-        df_side = in2exp(params[i], types[i], sides[i], i)
+        df_side = in2exp(params[i],weeks, sides[i], i)
         df_side = df_side.sort_values(['exit_date', 'enter_date'])
         single_pos_len = df_side.shape[1] - 1 if i == 0 else single_pos_len
         df = df_side if i == 0 else pd.merge(df, df_side, on=['exit_date', 'enter_date'], how='outer')
@@ -106,17 +113,18 @@ def backtests():
     ticker = 'QQQ'
     types = ['Put', 'Put']
     sides = ['short','long']
-    params = [7,16]
+    params = [23,]
+    weeks = 4
     strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2022-01-01'
+    start_date = '2020-01-01'
     before_date = '2023-01-01'
     premium_limit = None
     draw_or_show = 'show'
-    comm = 0.0125
+    comm = 0.01
 
-    df = bt_mon_fri(types,sides, params)
+    df = backtest(sides, params,weeks)
 
-    save_test(df, types, sides, params)
+    save_test(df, types, sides, params,weeks)
     lines_in_plot = int(df.shape[1] / single_pos_len)
     trades = len(df)
     summa = df['sum'].iloc[-1]

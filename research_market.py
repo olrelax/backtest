@@ -1,12 +1,12 @@
-import pandas as pd
+#import pandas as pd
 from dateutil.relativedelta import *
-import mplfinance as mpf
+#import mplfinance as mpf
 import inspect
 from au import *
 import matplotlib.pyplot as plt
+
 def add_days(dt):
     return dt + relativedelta(days=7)
-days_to_add = 5
 
 def get_name(var):
     callers_local_vars = inspect.currentframe().f_back.f_back.f_locals.items()
@@ -81,8 +81,16 @@ def comp_pattern():
     series = series.set_index('Date',drop=True)
     mpf.plot(series,type='ohlc')
     series.to_csv('../out/pat.csv',index=False)
-def add_wd(dt):
-    return add_work_days(dt,days_to_add)
+def add_wrk_days(dt):
+    return add_work_days(dt,exp_in)
+def add_wrk_days1(dt):
+    return add_work_days(dt,1)
+def add_wrk_days2(dt):
+    return add_work_days(dt,2)
+def add_wrk_days3(dt):
+    return add_work_days(dt,3)
+def add_wrk_days4(dt):
+    return add_work_days(dt,4)
 
 def premium_by_price():
     fn = 'UnderlyingOptionsIntervals_900sec_2022-04-04.csv'
@@ -100,18 +108,22 @@ def premium_by_price():
     df.plot(x=None,y=['bid','underlying_ask'],subplots=True,figsize=(11, 7))
     plt.show()
     plt.pause(0.0001)
-def max_week_move(tick,expire_in=4,enter_weekday=1,show_rows=5):
-    global days_to_add
-    days_to_add = expire_in
-    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick))
-    df['Date'] = pd.to_datetime(df['Date'])
+def max_week_move(tick,enter_weekday,show_rows,timing,yr=None):
+    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
+#    df['Date'] = pd.to_datetime(df['Date'])
     df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
-    df['late'] = pd.Series(map(add_wd,df['Date']))
-    enter_price = 'Open'
-    exit_price = 'Close'
-    df_left = df[['Date',enter_price,'wkd','late']]
+    df['exp_Date'] = pd.Series(map(add_wrk_days,df['Date']))
+
+    if yr is not None:
+        ed = s2d('%d-01-01' % (yr + 1))
+        bd = s2d('%d-01-01'%yr)
+        df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
+
+    enter_price = timing[0]
+    exit_price = timing[1]
+    df_left = df[['Date',enter_price,'wkd','exp_Date']]
     df_right = df[['Date',exit_price,'wkd']]
-    df1 = pd.merge(df_left,df_right,left_on='late',right_on='Date')
+    df1 = pd.merge(df_left,df_right,left_on='exp_Date',right_on='Date')
     df1 = df1.loc[df1['wkd_x'] == enter_weekday]
 
     df1['delta'] = df1[enter_price] - df1[exit_price]
@@ -122,20 +134,101 @@ def max_week_move(tick,expire_in=4,enter_weekday=1,show_rows=5):
     df1['delta_prc'] = 100*(df1['delta'])/df1[enter_price]
     df1 = df1[['Date_x',enter_price,'Date_y',exit_price,'wkd','delta','delta_prc']]
     down = df1.iloc[df1['delta_prc'].argsort()][-show_rows:]
-    up = (df1.iloc[df1['delta_prc'].argsort()][:show_rows])
-    up['delta'] = (up['delta'] * -1)
-    up['delta_prc'] = (up['delta_prc'] * -1)
-    up = up.sort_values('delta')
-    print('-------------------- UP ----------------------------\n',up)
-    print('-------------------- DOWN --------------------------\n',down)
+    down = df1.sort_values('delta_prc')[-show_rows:]
+    # print('-------------------- UP ----------------------------\nenter: %s exit: %s\n' % (enter_price,exit_price), up)
+    print('-------------------- DOWN --------------------------\nenter: %s exit: %s enter %d exp in %d \n' % (enter_price,exit_price,enter_weekday,exp_in),down)
+def max_week_move1(tick,enter_weekday,show_rows,yr=None,sort='Low'):
+    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
+#    df['Date'] = pd.to_datetime(df['Date'])
+    df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
+    df['exp_Date'] = pd.Series(map(add_wrk_days,df['Date']))
 
+    if yr is not None:
+        ed = s2d('%d-01-01' % (yr + 1))
+        bd = s2d('%d-01-01'%yr)
+        df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
+
+    df_in = df[['Date','Open','wkd','exp_Date']]
+    df_exit = df[['Date','Low','Close','wkd']]
+    df1 = pd.merge(df_in,df_exit,left_on='exp_Date',right_on='Date')
+    df1 = df1.loc[df1['wkd_x'] == enter_weekday]
+
+    df1['delta_low'] = df1['Open'] - df1['Low']
+    df1['delta_close'] = df1['Open'] - df1['Close']
+    df1 = df1.loc[df1.Date_x > s2d('2009-05-04')].reset_index(drop=True)
+    df1['wkd_x'] = pd.Series(map(str,df1['wkd_x']))
+    df1['wkd_y'] = pd.Series(map(str,df1['wkd_y']))
+    df1['wkd'] = df1['wkd_x'] + df1['wkd_y']
+    df1['prc_low'] = 100*(df1['delta_low'])/df1['Open']
+    df1['prc_close'] = 100*(df1['delta_close'])/df1['Open']
+    df1 = df1[['Date_x','Open','Date_y','Low','Close','prc_low','prc_close']]
+    sort_prc = 'prc_close' if sort == 'Close' else 'prc_low'
+    pd.set_option('display.precision', 2)
+    down = df1.sort_values(sort_prc)[-show_rows:]
+    print(down)
 
 def make_delta_column(df_in,discount):
     k = (100 - discount) / 100
     df_in['delta'] = (df_in['underlying_ask'] * k - df_in['strike']).abs() * 10.0
     df_in['delta'] = df_in['delta'].astype(int)
     return df_in
+def lowest_week_price(tick,enter_weekday,show_rows):
+    df = pd.read_csv('../data/%s/%s-yahoo_wkd.csv' % (tick,tick))[['Date','Open','Low','Close','wkd']]
+    df['Date'] = pd.to_datetime(df['Date'])
+    # df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
+    df['Date1'] = pd.Series(map(add_wrk_days1,df['Date']))
+    df['Date2'] = pd.Series(map(add_wrk_days1, df['Date1']))
+    df['Date3'] = pd.Series(map(add_wrk_days1, df['Date2']))
+    df['Date4'] = pd.Series(map(add_wrk_days1, df['Date3']))
+    df_left = df[['Date','Open','Low','Close','wkd','Date1','Date2','Date3','Date4']]
+    how = 'inner'
+    df_right1 = df[['Date','Low']].rename(columns={'Date': 'Date1','Low':'Low1'})
+    df1 = pd.merge(df_left,df_right1,on='Date1',how=how)
+    df_right2 = df[['Date','Low']].rename(columns={'Date': 'Date2','Low':'Low2'})
+    df2 = pd.merge(df1,df_right2,on='Date2',how=how)
+    df_right3 = df[['Date','Low']].rename(columns={'Date': 'Date3','Low':'Low3'})
+    df3 = pd.merge(df2,df_right3,on='Date3',how=how)
+    df_right4 = df[['Date','Low','Close']].rename(columns={'Date': 'Date4','Low':'Low4','Close':'Close4'})
+    df4 = pd.merge(df3,df_right4,on='Date4',how=how)
+    df = df4.loc[df4.wkd == enter_weekday].copy()
+    df['dd0'] = df.Open.sub(df.Low)
+    df['dd1'] = df.Open.sub(df.Low1)
+    df['dd2'] = df.Open.sub(df.Low2)
+    df['dd3'] = df.Open.sub(df.Low3)
+    df['dd4'] = df.Open.sub(df.Low4)
+    df['dd_Close'] = df.Open.sub(df.Close4)
+    df['dd_Low_max'] = df.Open.sub(df[['Low','Low1','Low2','Low3','Low4']].min(axis=1))
+    df['dd_Low_prc'] = (df['dd_Low_max']/df.Open) * 100
+    df['dd_Close_max'] = df.Open.sub(df.Close4)
+    df['dd_Close_prc'] = (df['dd_Close_max']/df.Open) * 100
+
+    df = df.loc[df.Date > s2d('2015-12-31')]
+    df = df.sort_values('dd_Low_prc')[['Date','Open','Low1','Low2',	'Low3','Low4','Close4','dd0','dd1','dd2','dd3','dd4','dd_Low_max','dd_Low_prc','dd_Close_max','dd_Close_prc','dd_Close','Date1','Date2','Date3','Date4']]
+
+    df = df[-20:]
+    dfp = df[['Date','dd_Low_prc','dd_Close_prc']]
+    print(dfp.tail(show_rows))
+
+def single_opt(opt_date,strike):
+    dt_date = s2d(opt_date)
+    y = dt_date.year
+    yahoo_df = pd.read_csv('../data/QQQ/QQQ-yahoo.csv',index_col=0,parse_dates=['Date'])
+    df = pd.read_csv('../data/QQQ/QQQ_CBOE_%s_P.csv' % y,parse_dates=['quote_date','expiration'])
+    df = df.loc[df['quote_date'] == dt_date].loc[df['strike'] == strike].loc[df['option_type'] == 'P']
+    df = pd.merge(df,yahoo_df,left_on='quote_date',right_on='Date')
+    df = df.rename(columns={'quote_date':'date','expiration':'exp','open':'o','high':'h','ask_1545':'1545','ask_eod':'eod','Open':'uopen','underlying_ask_1545':'u1545','underlying_ask_eod':'ueod'})
+    df = df[['exp','strike','uopen','o','u1545','1545','ueod','eod']].loc[(df['exp_weekday'] == 5) & (df['days_to_exp']<5)]
+    print('date %s' % opt_date)
+    print(df)
 
 
 if __name__ == '__main__':
-    max_week_move(tick='SPY',expire_in=4,enter_weekday=1,show_rows=10)
+    t = 'QQQ'
+    ent_weekday = 1
+    exp_in = 19
+    show_r = 20
+    year = None
+    day_timing = ['Open','Close']
+    # max_week_move1(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort='Low')
+    # lowest_week_price(tick=t,enter_weekday=ent_weekday,show_rows=show_r)
+    single_opt(opt_date='2020-03-20',strike=177)

@@ -16,14 +16,14 @@ import inspect
 def process_cboe_source_do(ticker,year, option_type):
     i = 0
     f = []
-    d = '../data/%s_%s_CBOE_SRC/' % (ticker,year)
+    d = '../data/%s/%s_%s_CBOE_SRC/' % (ticker,ticker,year)
     for (path, names, filenames) in walk(d):
         f.extend(filenames)
         break
     f.sort()
 
     rf = None
-    exp_time = relativedelta(months=1)
+    exp_time = relativedelta(months=2)
     for fn in f:
         if not fn[-3:] == 'csv':
             continue
@@ -40,13 +40,12 @@ def process_cboe_source_do(ticker,year, option_type):
         else:
             rf = rf.append(df.copy())
         i += 1
-    fn = '../data/%s_CBOE_%s_%s.csv' % (ticker,year,option_type)
-    rf.reset_index(drop=True).to_csv(fn)
+    fn = '../data/%s/%s_CBOE_%s_%s.csv' % (ticker,ticker,year,option_type)
+    rf.to_csv(fn,index=False)
     print('saved %s' % fn)
 def process_cboe_source(ticker,year=None,option_type=None):
-    if year is None and option_type is None:
-        process_cboe_source_do(ticker,2022,'P')
-        process_cboe_source_do(ticker,2022,'C')
+    process_cboe_source_do(ticker,year,'P')
+    process_cboe_source_do(ticker,year,'C')
 
 def download_yahoo(bd,ticker):
     ed = datetime.today().strftime('%Y-%m-%d')
@@ -129,14 +128,16 @@ def add_weekday(ticker,y=None):
         y = 2022
 
     def add_weekday_do(year, option_type):
-        fn = '../data/%s_CBOE_%s_%s.csv' % (ticker,year, option_type)
-        df = pd.read_csv('../data/%s' % fn)
+        fn = '../data/%s/%s_CBOE_%s_%s.csv' % (ticker,ticker,year, option_type)
+        print('add weekday %s...' % fn)
+        df = pd.read_csv(fn)
         df['quote_date'] = pd.to_datetime(df['quote_date'])
         df['expiration'] = pd.to_datetime(df['expiration'])
         df['weekday'] = pd.Series(map(lambda x: x.isoweekday(), df['quote_date']))
         df['exp_weekday'] = pd.Series(map(lambda x: x.isoweekday(), df['expiration']))
         df['days_to_exp'] = pd.Series(map(td, (df['expiration'] - df['quote_date'])))
         df.to_csv('%s' % fn, index=False)
+        print('done wkd %s' % fn)
 
     add_weekday_do(y,'P')
     add_weekday_do(y, 'C')
@@ -170,10 +171,17 @@ def loc_weekly_exp_cboe(ticker,y,t,exact=True):
     return dm
 
 
-def loc_mon_fri(ticker,y,t):
+def loc_mon_fri(ticker,y,wks):
+    o = read_opt(ticker,y,'P')
+    days_to_exp = 4+7*(wks-1)
+    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
+    d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == days_to_exp) & (d['weekday'] == 1))]
+    print('%dw%d weeks done' % (y,wks))
+    return d
+def loc_mon_wed(ticker,y,t):
     o = read_opt(ticker,y,t)
     d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
-    d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == 4) & (d['weekday'] == 1))]
+    d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 3)) | ((d['days_to_exp'] == 2) & (d['weekday'] == 1))]
     print('%d%s done' % (y,t))
     return d
 
@@ -201,11 +209,21 @@ def process_data(ch,arg_1=None,arg_2=None):
         add_weekday(ticker=arg_1,y=arg_2)
     elif ch == 'ftp':
         get_sftp_cboe(month=arg_1,days_arg=arg_2)
-    elif ch == 'lwe':
+    elif ch == 'mf':
+        ticker = arg_1
+        fun = loc_mon_fri
+        w = fun(ticker=arg_1,y=2020,wks=arg_2)
+        w = w.append(fun(ticker=arg_1,y=2021,wks=arg_2),ignore_index=True)
+        w = w.append(fun(ticker=arg_1,y=2022,wks=arg_2),ignore_index=True)
+        w = join_stock(w,ticker)
+        fn = '../data/%s/%s_mon_fri_%d.csv' % (ticker,ticker,arg_2)
+        # noinspection PyTypeChecker
+        w.to_csv(fn,index=False)
+    elif ch == 'mw':
         ticker = arg_1
         opt_type = arg_2
-        fun = loc_mon_fri
-        fn = '../data/%s/%s_mon_fri_%s.csv' % (ticker,ticker,opt_type)
+        fun = loc_mon_wed
+        fn = '../data/%s/%s_mon_wed_%s.csv' % (ticker,ticker,opt_type)
         w = fun(ticker=arg_1,y=2020,t=arg_2)
         w = w.append(fun(ticker=arg_1,y=2021,t=arg_2),ignore_index=True)
         w = w.append(fun(ticker=arg_1,y=2022,t=arg_2),ignore_index=True)
@@ -223,7 +241,7 @@ def deb():
 
 
 def select_task():
-    process_data('lwe','SPY','C')
+    process_data('mf','QQQ',4)
 
 if __name__ == '__main__':
     select_task()
