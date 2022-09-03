@@ -10,8 +10,9 @@ before_date = ''
 fn = ''
 algo = ''
 strike_loss_limit = -100
-premium_limit = 0
 comm = 0
+min_profit = 0
+max_profit = 0
 def show(df, stop=True):
     name = get_name(df)[0]
     print('-----------------%s------------' % name)
@@ -50,55 +51,52 @@ def numerate(df,i):
 def get_sold(price):
     return 0 if price < 0.0101 else price
 
-def make_delta_column(df_in,opt_type,disc):
-    k = (100 + disc * (1 if opt_type == 'Call' else -1)) / 100
-    df_in['delta'] = (df_in['underlying_open'] * k - df_in['strike']).abs() * 10.0
+def make_delta_column(df_in,opt_type,params,i):
+    k = (100 + params[0] * (1 if opt_type[0] == 'C' else -1)) / 100
+    hedge_shift = params[1] * i * (1 if opt_type[0] == 'C' else -1)
+    df_in['delta'] = (df_in['underlying_open'] * k + hedge_shift - df_in['strike']).abs() * 10.0
     df_in['delta'] = df_in['delta'].astype(int)
     return df_in
 def zero_or_not(diff):
     return 1. if diff > 0 else 0
 
-def in2exp(param, weeks,side, i):
+def in2exp(params, weeks,side, opt_type,i):
 
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
-    opts_fn = '../data/%s/%s_mon_fri_%d.csv' % (ticker,ticker,weeks)
+    opts_fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,opt_type[0],weeks)
     df = pd.read_csv(opts_fn,parse_dates=['quote_date','expiration'])
     df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
-    df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type='P',disc=param)
+    df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,params=params,i=i)
     df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
     df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
         subset=['quote_date', 'expiration'])[['quote_date', 'expiration', 'strike', 'underlying_open', 'open']]
     prefix = 'ask' if side == 'short' else 'bid'
     df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_close','%s_eod' % prefix]].rename(columns={'%s_eod' % prefix:'out_tmp','underlying_close':'under_out'}).copy().reset_index(drop=True)
-    df_out['diff'] = df_out['strike'] - df_out['under_out']
-    df_out['k'] = pd.Series(map(zero_or_not,df_out['diff'])).to_frame()
-    df_out['out'] = df_out['out_tmp'] * df_out['k']
-    # save(df_out,None,True)
+    sign = 1. if opt_type[0] == 'P' else -1.
+    df_out['diff'] = (df_out['strike'] - df_out['under_out']) * sign
+    df_out['k'] = pd.Series(map(zero_or_not,df_out['diff'])).to_frame()     # make out price 0.0 if not executed on expiration
+    df_out['out'] = (df_out['out_tmp'] * df_out['k'])
+    df_out = df_out.drop(columns=['k','out_tmp'])
     df = pd.merge(df_in, df_out, on=['expiration', 'strike']).reset_index(drop=True)
-    # df['margin'] = (df['open'] - pd.Series(map(get_sold, df['out']))) * (1. if side == 'short' else -1.)
     df['margin'] = (df['open'] - df['out']) * (1. if side == 'short' else -1.)
     df['profit'] = df['margin'].sub(comm)
+    if side == 'short':
+        if min_profit > 0:
+            df = df.loc[df['open'] > min_profit]
+        if max_profit > 0:
+            df = df.loc[df['open'] < max_profit]
     df = numerate(df,i)
-    df['exit_date'] = df['expiration']
-    cols = df.columns.tolist()
-    cols.insert(2, 'exit_date')
-    cols.pop(-1)
-    df['enter_date'] = df['quote_date']
-    cols.insert(2, 'enter_date')
-    df = df[cols]
     return df
-def backtest(sides,params,weeks):
+def backtest(types,sides,params,weeks):
     global count, single_pos_len
-    count = min(len(sides), len(params))
+    count = min(len(sides), len(params),len(types))
     df = None
     for i in range(count):
-        df_side = in2exp(params[i],weeks, sides[i], i)
-        df_side = df_side.sort_values(['exit_date', 'enter_date'])
+        df_side = in2exp(params,weeks, sides[i],types[i], i)
+        df_side = df_side.sort_values(['quote_date', 'expiration'])
         single_pos_len = df_side.shape[1] - 1 if i == 0 else single_pos_len
-        df = df_side if i == 0 else pd.merge(df, df_side, on=['exit_date', 'enter_date'], how='outer')
-    df = df.rename(columns={'quote_date_x':'quote_date','expiration_x':'expiration'})
-    df = df.sort_values(['exit_date', 'enter_date'])
+        df = df_side if i == 0 else pd.merge(df, df_side, on=['quote_date', 'expiration'], how='inner')
 
     for i in range(count):
         df['sum_%d' % i] = df['profit_%d' % i].cumsum(axis=0)
@@ -109,28 +107,30 @@ def backtest(sides,params,weeks):
 
 
 def backtests():
-    global algo, before_date, start_date, fn,strike_loss_limit,premium_limit,ticker,comm
+    global algo, before_date, start_date, fn,strike_loss_limit,ticker,comm,min_profit,max_profit
     ticker = 'QQQ'
-    types = ['Put', 'Put']
+    types = ['Put','Put']   # P, C
     sides = ['short','long']
-    params = [23,]
-    weeks = 4
+    disc_prc = 6
+    hedge_usd = 10
+    weeks = 1
     strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2020-01-01'
+    start_date = '2001-01-01'
     before_date = '2023-01-01'
-    premium_limit = None
     draw_or_show = 'show'
     comm = 0.01
+    min_profit = 0.
+    max_profit = 0.
 
-    df = backtest(sides, params,weeks)
+    df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
 
-    save_test(df, types, sides, params,weeks)
+    save_test(df, types, sides, [disc_prc,hedge_usd],weeks)
     lines_in_plot = int(df.shape[1] / single_pos_len)
     trades = len(df)
     summa = df['sum'].iloc[-1]
     avg = summa / trades
     txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f'\
-        .format(ticker, algo, types, sides, params, trades) % (summa,avg)
+        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg)
     plot(df,txt,lines_count=lines_in_plot,draw_or_show=draw_or_show,fn=fn)
     if draw_or_show == 'draw':
         input('pause >')

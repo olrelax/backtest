@@ -32,14 +32,14 @@ def custom_plot_(df,a,b):
 def plot(df,txt,lines_count,draw_or_show,fn):
 
     if lines_count == 1:
-        dfp = df[['exit_date', 'sum_0']]
+        dfp = df[['expiration', 'sum_0']]
     else:
-        cols = 'exit_date,'
+        cols = 'expiration,'
         for i in range(lines_count):
             cols = cols + 'sum_%d,' % i
         cols = cols + 'sum'
         dfp = df[cols.split(',')]
-    dfp = dfp.set_index('exit_date')
+    dfp = dfp.set_index('expiration')
     ax = dfp.plot(figsize=(11, 7), title=txt)
     xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')
     ax.set_xticks(xtick, minor=True)

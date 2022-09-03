@@ -89,8 +89,10 @@ def add_wrk_days2(dt):
     return add_work_days(dt,2)
 def add_wrk_days3(dt):
     return add_work_days(dt,3)
+
 def add_wrk_days4(dt):
-    return add_work_days(dt,4)
+    global exp_in
+    return add_work_days(dt,exp_in)
 
 def premium_by_price():
     fn = 'UnderlyingOptionsIntervals_900sec_2022-04-04.csv'
@@ -108,70 +110,6 @@ def premium_by_price():
     df.plot(x=None,y=['bid','underlying_ask'],subplots=True,figsize=(11, 7))
     plt.show()
     plt.pause(0.0001)
-def max_week_move(tick,enter_weekday,show_rows,timing,yr=None):
-    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
-#    df['Date'] = pd.to_datetime(df['Date'])
-    df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
-    df['exp_Date'] = pd.Series(map(add_wrk_days,df['Date']))
-
-    if yr is not None:
-        ed = s2d('%d-01-01' % (yr + 1))
-        bd = s2d('%d-01-01'%yr)
-        df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
-
-    enter_price = timing[0]
-    exit_price = timing[1]
-    df_left = df[['Date',enter_price,'wkd','exp_Date']]
-    df_right = df[['Date',exit_price,'wkd']]
-    df1 = pd.merge(df_left,df_right,left_on='exp_Date',right_on='Date')
-    df1 = df1.loc[df1['wkd_x'] == enter_weekday]
-
-    df1['delta'] = df1[enter_price] - df1[exit_price]
-    df1 = df1.loc[df1.Date_x > s2d('2009-05-04')].reset_index(drop=True)
-    df1['wkd_x'] = pd.Series(map(str,df1['wkd_x']))
-    df1['wkd_y'] = pd.Series(map(str,df1['wkd_y']))
-    df1['wkd'] = df1['wkd_x'] + df1['wkd_y']
-    df1['delta_prc'] = 100*(df1['delta'])/df1[enter_price]
-    df1 = df1[['Date_x',enter_price,'Date_y',exit_price,'wkd','delta','delta_prc']]
-    down = df1.iloc[df1['delta_prc'].argsort()][-show_rows:]
-    down = df1.sort_values('delta_prc')[-show_rows:]
-    # print('-------------------- UP ----------------------------\nenter: %s exit: %s\n' % (enter_price,exit_price), up)
-    print('-------------------- DOWN --------------------------\nenter: %s exit: %s enter %d exp in %d \n' % (enter_price,exit_price,enter_weekday,exp_in),down)
-def max_week_move1(tick,enter_weekday,show_rows,yr=None,sort='Low'):
-    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
-#    df['Date'] = pd.to_datetime(df['Date'])
-    df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
-    df['exp_Date'] = pd.Series(map(add_wrk_days,df['Date']))
-
-    if yr is not None:
-        ed = s2d('%d-01-01' % (yr + 1))
-        bd = s2d('%d-01-01'%yr)
-        df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
-
-    df_in = df[['Date','Open','wkd','exp_Date']]
-    df_exit = df[['Date','Low','Close','wkd']]
-    df1 = pd.merge(df_in,df_exit,left_on='exp_Date',right_on='Date')
-    df1 = df1.loc[df1['wkd_x'] == enter_weekday]
-
-    df1['delta_low'] = df1['Open'] - df1['Low']
-    df1['delta_close'] = df1['Open'] - df1['Close']
-    df1 = df1.loc[df1.Date_x > s2d('2009-05-04')].reset_index(drop=True)
-    df1['wkd_x'] = pd.Series(map(str,df1['wkd_x']))
-    df1['wkd_y'] = pd.Series(map(str,df1['wkd_y']))
-    df1['wkd'] = df1['wkd_x'] + df1['wkd_y']
-    df1['prc_low'] = 100*(df1['delta_low'])/df1['Open']
-    df1['prc_close'] = 100*(df1['delta_close'])/df1['Open']
-    df1 = df1[['Date_x','Open','Date_y','Low','Close','prc_low','prc_close']]
-    sort_prc = 'prc_close' if sort == 'Close' else 'prc_low'
-    pd.set_option('display.precision', 2)
-    down = df1.sort_values(sort_prc)[-show_rows:]
-    print(down)
-
-def make_delta_column(df_in,discount):
-    k = (100 - discount) / 100
-    df_in['delta'] = (df_in['underlying_ask'] * k - df_in['strike']).abs() * 10.0
-    df_in['delta'] = df_in['delta'].astype(int)
-    return df_in
 def lowest_week_price(tick,enter_weekday,show_rows):
     df = pd.read_csv('../data/%s/%s-yahoo_wkd.csv' % (tick,tick))[['Date','Open','Low','Close','wkd']]
     df['Date'] = pd.to_datetime(df['Date'])
@@ -208,6 +146,74 @@ def lowest_week_price(tick,enter_weekday,show_rows):
     df = df[-20:]
     dfp = df[['Date','dd_Low_prc','dd_Close_prc']]
     print(dfp.tail(show_rows))
+def max_week_move_0(tick,enter_weekday,show_rows,timing,yr=None):
+    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
+#    df['Date'] = pd.to_datetime(df['Date'])
+    df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
+    df['exp_Date'] = pd.Series(map(add_wrk_days,df['Date']))
+
+    if yr is not None:
+        ed = s2d('%d-01-01' % (yr + 1))
+        bd = s2d('%d-01-01'%yr)
+        df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
+
+    in_ohlc = timing[0]
+    out_ohlc = timing[1]
+    df_left = df[['Date',in_ohlc,'wkd','exp_Date']]
+    df_right = df[['Date',out_ohlc,'wkd']]
+    df1 = pd.merge(df_left,df_right,left_on='exp_Date',right_on='Date')
+    df1 = df1.rename(columns={'wkd_x':'wkd_in','wkd_y':'wkd_out'})
+    df1 = df1.loc[df1['wkd_x'] == enter_weekday]
+
+    df1['delta'] = df1[in_ohlc] - df1[out_ohlc]
+    df1 = df1.loc[df1.Date_x > s2d('2009-05-04')].reset_index(drop=True)
+    df1['wkd_in'] = pd.Series(map(str,df1['wkd_in']))
+    df1['wkd_out'] = pd.Series(map(str,df1['wkd_out']))
+    df1['wkd'] = df1['wkd_x'] + df1['wkd_y']
+    df1['delta_prc'] = 100*(df1['delta'])/df1[in_ohlc]
+    df1 = df1[['Date_x',in_ohlc,'Date_y',out_ohlc,'wkd','delta','delta_prc']]
+    down = df1.sort_values('delta_prc')[-show_rows:]
+    # print('-------------------- UP ----------------------------\nenter: %s exit: %s\n' % (enter_price,exit_price), up)
+    print('-------------------- DOWN --------------------------\nenter: %s exit: %s enter %d exp in %d \n' % (in_ohlc,out_ohlc,enter_weekday,exp_in),down)
+def max_move(tick,enter_weekday,show_rows,yr=None,sort='Low'):
+    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
+    df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
+    df['exp_Date'] = pd.Series(map(lambda x: add_wrk_days(x),df['Date']))
+    if yr is not None:
+        ed = s2d('%d-01-01' % (yr + 1))
+        bd = s2d('%d-01-01'%yr)
+        df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
+
+    df_in = df[['Date','Open','wkd','exp_Date']]
+    df_exit = df[['Date','High','Low','Close','wkd']]
+    df1 = pd.merge(df_in,df_exit,left_on='exp_Date',right_on='Date')
+    df1 = df1.loc[df1['wkd_x'] == enter_weekday]
+
+    df1['delta_low'] = df1['Open'] - df1['Low']
+    df1['delta_close'] = df1['Open'] - df1['Close']
+    df1['delta_high'] = df1['Open'] - df1['High']
+    df1 = df1.loc[df1.Date_x > s2d('2009-05-04')].reset_index(drop=True)
+    df1['wkd_x'] = pd.Series(map(str,df1['wkd_x']))
+    df1['wkd_y'] = pd.Series(map(str,df1['wkd_y']))
+    df1['wkd'] = df1['wkd_x'] + df1['wkd_y']
+    df1['prc_low'] = 100*(df1['delta_low'])/df1['Open']
+    df1['prc_high'] = 100*(df1['delta_high'])/df1['Open']
+    df1['prc_close'] = 100*(df1['delta_close'])/df1['Open']
+    df_down = df1[['Date_x','Open','Date_y','Low','Close','prc_low','prc_close']]
+    df_up = df1[['Date_x','Open','Date_y','High','Close','prc_high','prc_close']]
+    pd.set_option('display.precision', 2)
+    down = df_down.sort_values(sort)[-show_rows:]
+    up = df_up.sort_values(sort)[:show_rows]
+    print('------------UP---------------')
+    print(up)
+    print('------------DOWN---------------')
+    print(down)
+
+def make_delta_column(df_in,discount):
+    k = (100 - discount) / 100
+    df_in['delta'] = (df_in['underlying_ask'] * k - df_in['strike']).abs() * 10.0
+    df_in['delta'] = df_in['delta'].astype(int)
+    return df_in
 
 def single_opt(opt_date,strike):
     dt_date = s2d(opt_date)
@@ -225,10 +231,11 @@ def single_opt(opt_date,strike):
 if __name__ == '__main__':
     t = 'QQQ'
     ent_weekday = 1
-    exp_in = 19
-    show_r = 20
+    exp_in = 4
+    show_r = 16
     year = None
     day_timing = ['Open','Close']
-    # max_week_move1(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort='Low')
+    arg_sort = 'prc_close'
+    max_move(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)
     # lowest_week_price(tick=t,enter_weekday=ent_weekday,show_rows=show_r)
-    single_opt(opt_date='2020-03-20',strike=177)
+    # single_opt(opt_date='2020-03-20',strike=177)
