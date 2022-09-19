@@ -86,9 +86,9 @@ def in2exp(params, weeks,side, opt_type,i):
     df['profit'] = df['margin'].sub(comm)
     if side == 'short':
         if min_profit > 0:
-            df = df.loc[df['open'] > min_profit]
+            df = df.loc[df['open'] >= min_profit]
         if max_profit > 0:
-            df = df.loc[df['open'] < max_profit]
+            df = df.loc[df['open'] <= max_profit]
     df = numerate(df,i)
     return df
 def backtest(types,sides,params,weeks):
@@ -114,7 +114,7 @@ def backtests():
     ticker = 'QQQ'
     types = ['Put','Put']   # P, C
     sides = ['short','long']
-    disc_prc = 9
+    disc_prc = 9.5
     hedge_usd = 10
     weeks = 1
     strike_loss_limit = None  # in USD if > 1 else in %
@@ -122,7 +122,7 @@ def backtests():
     before_date = '2023-01-01'
     draw_or_show = 'show'
     comm = 0.01
-    min_profit = 0.2
+    min_profit = 0.16
     max_profit = 0.
 
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
