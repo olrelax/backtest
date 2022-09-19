@@ -65,7 +65,10 @@ def in2exp(params, weeks,side, opt_type,i):
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
     opts_fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,opt_type[0],weeks)
-    df = pd.read_csv(opts_fn,parse_dates=['quote_date','expiration'])
+    df = pd.read_csv(opts_fn)    # ,parse_dates=['quote_date','expiration'])
+    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
+    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+
     df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
     df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,params=params,i=i)
     df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
@@ -111,15 +114,15 @@ def backtests():
     ticker = 'QQQ'
     types = ['Put','Put']   # P, C
     sides = ['short','long']
-    disc_prc = 6
+    disc_prc = 9
     hedge_usd = 10
     weeks = 1
     strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2001-01-01'
+    start_date = '2022-01-01'
     before_date = '2023-01-01'
     draw_or_show = 'show'
     comm = 0.01
-    min_profit = 0.
+    min_profit = 0.2
     max_profit = 0.
 
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
@@ -129,8 +132,8 @@ def backtests():
     trades = len(df)
     summa = df['sum'].iloc[-1]
     avg = summa / trades
-    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f'\
-        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg)
+    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f,>=%.2f'\
+        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_profit)
     plot(df,txt,lines_count=lines_in_plot,draw_or_show=draw_or_show,fn=fn)
     if draw_or_show == 'draw':
         input('pause >')

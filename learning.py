@@ -11,4 +11,5 @@ def isin():
     df1_in_d2 = df1.loc[df1['col1'].isin(df2['col1'])]
     print(df1_in_d2)
 if __name__ == '__main__':
-    print('\u534D')
+    # print('\u534D')
+    print('uiygsdiufygisdf sdafsdf sdfosadf asdfjsdfoo sdfoiusfd fdsoasdf fdsosdf fdsosdf fdssdf fds9sd ffdsasdf uiygsdiufygisdf sdafsdf sdfosadf asdfjsdfoo sdfoiusfd fdsoasdf fdsosdf fdsosdf fdssdf fds9sd ffdsasdf')

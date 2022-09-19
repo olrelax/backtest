@@ -232,8 +232,8 @@ if __name__ == '__main__':
     t = 'QQQ'
     ent_weekday = 1
     exp_in = 4
-    show_r = 16
-    year = None
+    show_r = 7
+    year = 2022
     day_timing = ['Open','Close']
     arg_sort = 'prc_close'
     max_move(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)

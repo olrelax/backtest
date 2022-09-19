@@ -28,8 +28,8 @@ def process_cboe_source_do(ticker,year, option_type):
         if not fn[-3:] == 'csv':
             continue
         df = pd.read_csv('%s/%s' % (d,fn))
-        df['expiration'] = pd.to_datetime(df['expiration'])
-        df['quote_date'] = pd.to_datetime(df['quote_date'])
+        df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+        df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
         qd = df['quote_date'].iloc[0]
         exp = qd + exp_time
         df = df.loc[df['expiration'] <= exp]
@@ -53,6 +53,7 @@ def download_yahoo(bd,ticker):
     e = time.mktime(datetime.strptime(ed, '%Y-%m-%d').timetuple())
     fn = '../data/%s/%s-yahoo.csv' % (ticker,ticker)
     url = 'https://query1.finance.yahoo.com/v7/finance/download/%s?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true' % (ticker,b,e)
+    print(url)
     try:
         with urllib.request.urlopen(url,context=ssl.SSLContext()) as f:
             html = f.read().decode('utf-8')
@@ -174,7 +175,7 @@ def loc_weekly_exp_cboe(ticker,y,t,exact=True):
 def loc_mon_fri(ticker,y,opt_type,wks):
     o = read_opt(ticker,y,opt_type)
     days_to_exp = 4+7*(wks-1)
-    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
+    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']].sort_values(['quote_date','expiration'])
     d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == days_to_exp) & (d['weekday'] == 1))]
     print('%s %dw%d weeks done' % (opt_type,y,wks))
     return d
@@ -224,7 +225,8 @@ def deb():
 
 
 def select_task():
-    process_data('mf','QQQ','P',1)
+    #process_data('r','QQQ',2022)
+    process_data('y','QQQ')
 
 if __name__ == '__main__':
     select_task()
