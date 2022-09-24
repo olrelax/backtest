@@ -2,14 +2,14 @@ import pandas as pd
 from os import walk
 from dateutil.relativedelta import *
 from datetime import datetime
-from au import add_days,read_opt
+from au import add_days,read_opt,read_entry
 from os import system
 import time
 import urllib.request
 import urllib.error
 from io import StringIO
 import ssl
-import paramiko
+#import paramiko
 import zipfile
 import inspect
 
@@ -45,7 +45,8 @@ def process_cboe_source_do(ticker,year, option_type):
     print('saved %s' % fn)
 def process_cboe_source(ticker,year=None,option_type=None):
     process_cboe_source_do(ticker,year,'P')
-    process_cboe_source_do(ticker,year,'C')
+    print('process Call type skipped')
+    # process_cboe_source_do(ticker,year,'C')
 
 def download_yahoo(bd,ticker):
     ed = datetime.today().strftime('%Y-%m-%d')
@@ -200,33 +201,32 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
     if ch == 'y':
         download_yahoo('2007-01-01',arg_1)
     elif ch == 'r':
-        process_cboe_source(ticker=arg_1,year=arg_2)
-        add_weekday(ticker=arg_1,y=arg_2)
-    elif ch == 'ftp':
-        get_sftp_cboe(month=arg_1,days_arg=arg_2)
+        process_cboe_source(ticker=arg_1,year=int(arg_2))
+        add_weekday(ticker=arg_1,y=int(arg_2))
     elif ch == 'mf':
         ticker = arg_1
         fun = loc_mon_fri
-        w = fun(ticker=arg_1,y=2020,opt_type=arg_2,wks=arg_3)
-        w = w.append(fun(ticker=arg_1,y=2021,opt_type=arg_2,wks=arg_3),ignore_index=True)
-        w = w.append(fun(ticker=arg_1,y=2022,opt_type=arg_2,wks=arg_3),ignore_index=True)
+        weeks = 1 if arg_3 =='' else int(arg_3)
+        w = fun(ticker=arg_1,y=2020,opt_type=arg_2,wks=weeks)
+        w = w.append(fun(ticker=arg_1,y=2021,opt_type=arg_2,wks=weeks),ignore_index=True)
+        w = w.append(fun(ticker=arg_1,y=2022,opt_type=arg_2,wks=weeks),ignore_index=True)
         w = join_stock(w,ticker)
-        fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,arg_2,arg_3)
+        fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,arg_2,weeks)
         # noinspection PyTypeChecker
         w.to_csv(fn,index=False)
-
-    elif ch == 'mlf':
-        make_long_file(2020)
-    elif ch == 'ls':
-        deb()
 def deb():
     d = '../data/SPY_2022_CBOE_SRC/'
     system('ls %s|tail -n 5' % d)
 
 
 def select_task():
-    #process_data('r','QQQ',2022)
-    process_data('y','QQQ')
+    # process_data('r','QQQ',2022)
+    #process_data('mf','ddd','P')
+    chars = read_entry('prepare','chars')
+    arg1 = read_entry('prepare','arg1')
+    arg2 = read_entry('prepare','arg2')
+    arg3 = read_entry('prepare','arg3')
+    process_data(chars,arg1,arg2,arg3)
 
 if __name__ == '__main__':
     select_task()

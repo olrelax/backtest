@@ -230,10 +230,10 @@ def single_opt(opt_date,strike):
 
 if __name__ == '__main__':
     t = 'QQQ'
-    ent_weekday = 1
-    exp_in = 4
+    ent_weekday = 5
+    exp_in = 1
     show_r = 7
-    year = 2022
+    year = None
     day_timing = ['Open','Close']
     arg_sort = 'prc_close'
     max_move(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)

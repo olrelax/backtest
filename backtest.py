@@ -1,6 +1,7 @@
 import pandas as pd
 from datetime import datetime
 import inspect
+from au import read_entry
 from plot import plot
 count = 0
 single_pos_len = 0
@@ -111,19 +112,19 @@ def backtest(types,sides,params,weeks):
 
 def backtests():
     global algo, before_date, start_date, fn,strike_loss_limit,ticker,comm,min_profit,max_profit
-    ticker = 'QQQ'
     types = ['Put','Put']   # P, C
     sides = ['short','long']
-    disc_prc = 9.5
-    hedge_usd = 10
     weeks = 1
-    strike_loss_limit = None  # in USD if > 1 else in %
-    start_date = '2022-01-01'
-    before_date = '2023-01-01'
     draw_or_show = 'show'
-    comm = 0.01
-    min_profit = 0.16
-    max_profit = 0.
+    strike_loss_limit = None  # in USD if > 1 else in %
+    start_date = read_entry('backtest','start_date')
+    before_date = read_entry('backtest','before_date')
+    ticker = read_entry('backtest','ticker')
+    disc_prc = float(read_entry('backtest','disc_prc'))
+    hedge_usd = int(read_entry('backtest','hedge_usd'))
+    comm = float(read_entry('backtest','comm'))
+    min_profit = float(read_entry('backtest','min_profit'))
+    max_profit = float(read_entry('backtest','max_profit'))
 
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
 

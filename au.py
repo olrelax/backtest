@@ -4,6 +4,8 @@ import pandas as pd
 import globalvars as gv
 from os import path
 import time
+from configparser import ConfigParser, NoOptionError
+
 """
 from inspect import currentframe, getframeinfo
 fl(getframeinfo(currentframe()))
@@ -151,3 +153,19 @@ def add_months(dt,n):
 def save_csv(df,fn):
     df.to_csv(fn, index=False)
 
+
+parser = None
+
+#def set_config_object():
+#    global config_object
+#    config_object = ConfigParser()
+#    config_object.read('data/init/config.ini')
+
+
+def read_entry(section, entry_name):
+    global parser
+    if parser is None:
+        parser = ConfigParser()
+        parser.read('config.ini')
+    a = parser.get(section, entry_name)
+    return a
