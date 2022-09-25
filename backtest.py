@@ -10,7 +10,6 @@ start_date = ''
 before_date = ''
 fn = ''
 algo = ''
-strike_loss_limit = -100
 comm = 0
 min_profit = 0
 max_profit = 0
@@ -26,9 +25,9 @@ def show(df, stop=True):
 def save_test(df, types, sides, params,exp_weekday):
     global fn
     fn = datetime.strftime(datetime.now(), '%d-%-H-%M-%S')
-    ini = open('../out/i-%s.txt' % fn, 'w')
-    print('type {},sides{},params{}, str_loss_lim {},{}'.format(types, sides, params, strike_loss_limit,exp_weekday), file=ini)
-    ini.close()
+    # ini = open('../out/i-%s.txt' % fn, 'w')
+    # print('type {},sides{},params{},{}'.format(types, sides, params,exp_weekday), file=ini)
+    # ini.close()
     # noinspection PyTypeChecker
     df.to_csv('../out/e-%s.csv' % fn, index=False)
 
@@ -111,12 +110,11 @@ def backtest(types,sides,params,weeks):
 
 
 def backtests():
-    global algo, before_date, start_date, fn,strike_loss_limit,ticker,comm,min_profit,max_profit
-    types = ['Put','Put']   # P, C
-    sides = ['short','long']
+    global algo, before_date, start_date, fn,ticker,comm,min_profit,max_profit
     weeks = 1
     draw_or_show = 'show'
-    strike_loss_limit = None  # in USD if > 1 else in %
+    types = read_entry('backtest','types').split(',')
+    sides = read_entry('backtest','sides').split(',')
     start_date = read_entry('backtest','start_date')
     before_date = read_entry('backtest','before_date')
     ticker = read_entry('backtest','ticker')
