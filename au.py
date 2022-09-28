@@ -1,52 +1,33 @@
 from datetime import datetime,timedelta
 from dateutil.relativedelta import *
 import pandas as pd
-import globalvars as gv
 from os import path
 import time
 from configparser import ConfigParser, NoOptionError
 
-"""
-from inspect import currentframe, getframeinfo
-fl(getframeinfo(currentframe()))
-from au import fl
-"""
 def days_from_to(d0,d1):
     delta = d1 - d0
     return delta.days
-def get_latest_trade_day(date):
-    if date is None:
-        return gv.stock['date'].iloc[-1]
-    else:
-        return gv.stock.loc[gv.stock['date'] <= s2d(date)]['date'].iloc[-1]
-
 def read_opt_file(ofn):
     df = pd.read_csv(ofn)
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     return df
 def normalize(df):
-    opt_min = df[['sum_1', 'sum_2', 'sum']].to_numpy().min()
-    opt_max = df[['sum_1', 'sum_2', 'sum']].to_numpy().max()
-    under_min = df['under_1_out'].to_numpy().min()
-    under_max = df['under_1_out'].to_numpy().max()
-    df['under_1_out'] = df['under_1_out'] * (opt_max - opt_min) / (under_max - under_min)
-    under_min = df['under_1_out'].to_numpy().min()
-    df['under_1_out'] = df['under_1_out'] - under_min + opt_min
+    stock = 'Close'
+    opt_min = df[['sum_0', 'sum_1', 'sum']].to_numpy().min()
+    opt_max = df[['sum_0', 'sum_1', 'sum']].to_numpy().max()
+    under_min = df[stock].to_numpy().min()
+    under_max = df[stock].to_numpy().max()
+    df[stock] = df[stock] * (opt_max - opt_min) / (under_max - under_min)
+    under_min = df[stock].to_numpy().min()
+    df[stock] = df[stock] - under_min + opt_min
     return df
 
 
 def fl(arg):
     string = path.basename(arg.filename) + ':' + str(arg.lineno) + ' ' + datetime.now().strftime('%M:%S:%f')
     print(string)
-def read_stock():
-    print('read stock hist...')
-    stock = pd.read_csv('../data/spy.csv')
-    stock['date'] = pd.to_datetime(stock['date'])
-    start_date = add_months(s2d(gv.bd),-1)
-    stock_1 = stock[stock['date'] >= start_date]
-    stock = stock_1[stock_1['date'] >= start_date].copy().reset_index(drop=True)
-    return stock
 
 def read_opt(ticker,year,opt_type):
     fn = '../data/%s/%s_CBOE_%d_%s.csv' % (ticker,ticker,year,opt_type)
@@ -76,10 +57,6 @@ def s2d(text,fmt='%Y-%m-%d'):
         s = '{}'.format(e)
         exit(s)
     return s
-def intraday_tested_dates(dt):
-    date = d2s(dt)
-    dates_list = gv.intraday_tested.split(',')
-    return date in dates_list
 
 dtm_fmt_Y_m_d = '%Y-%m-%d'
 def prn(text, color=''):
@@ -101,13 +78,6 @@ def prn(text, color=''):
         print(text)
 
 
-#        else:
-#            s_sort = df_bk.iloc[(df_bk['strike'] - target_strike).abs().argsort()]
-#            mi = s_sort['strike'].iloc[-1]
-#            ma = s_sort['strike'].iloc[0]
-#            s = '%s get_opt: looking for strike %.2f at exp %s found %.2f-%.2f' % (d2s(quote_date), target_strike,d2s(expiration), mi,ma)
-#            prn(s,'red')
-#            return -15, None
 
 
 def get_closest(df_arg, val, put_or_call):
@@ -169,3 +139,18 @@ def read_entry(section, entry_name):
         parser.read('config.ini')
     a = parser.get(section, entry_name)
     return a
+
+def add_stock(out_df):
+    fn = '../data/QQQ/QQQ-yahoo.csv'
+    bd = out_df['quote_date'].iloc[0]
+    ed = out_df['quote_date'].iloc[-1]
+    stock = pd.read_csv(fn)
+    stock['Date'] = pd.to_datetime(stock['Date'])
+    stock = stock.loc[(stock['Date'] <= ed) & (stock['Date'] >= bd)]
+    stock = stock.rename(columns={'Date':'quote_date'})
+    df = pd.merge(stock,out_df,on='quote_date',how='outer')
+    df['sum_0'] = df['sum_0'].fillna(method='ffill')
+    df['sum_1'] = df['sum_1'].fillna(method='ffill')
+    df['sum'] = df['sum'].fillna(method='ffill')
+
+    return normalize(df)

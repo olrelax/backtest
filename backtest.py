@@ -1,10 +1,10 @@
 import pandas as pd
 from datetime import datetime
 import inspect
-from au import read_entry
+from au import read_entry,add_stock
 from plot import plot
 count = 0
-single_pos_len = 0
+single_option_col_count = 0
 ticker = ''
 start_date = ''
 before_date = ''
@@ -74,8 +74,9 @@ def in2exp(params, weeks,side, opt_type,i):
     df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
     df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
         subset=['quote_date', 'expiration'])[['quote_date', 'expiration', 'strike', 'underlying_open', 'open']]
-    prefix = 'ask' if side == 'short' else 'bid'
-    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_close','%s_eod' % prefix]].rename(columns={'%s_eod' % prefix:'out_tmp','underlying_close':'under_out'}).copy().reset_index(drop=True)
+    opt_prefix = 'ask' if side == 'short' else 'bid'
+    under_prefix = 'bid' if side == 'short' else 'ask'
+    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_bid_eod','%s_eod' % opt_prefix]].rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'}).copy().reset_index(drop=True)
     sign = 1. if opt_type[0] == 'P' else -1.
     df_out['diff'] = (df_out['strike'] - df_out['under_out']) * sign
     df_out['k'] = pd.Series(map(zero_or_not,df_out['diff'])).to_frame()     # make out price 0.0 if not executed on expiration
@@ -92,13 +93,13 @@ def in2exp(params, weeks,side, opt_type,i):
     df = numerate(df,i)
     return df
 def backtest(types,sides,params,weeks):
-    global count, single_pos_len
+    global count, single_option_col_count
     count = min(len(sides), len(params),len(types))
     df = None
     for i in range(count):
         df_side = in2exp(params,weeks, sides[i],types[i], i)
         df_side = df_side.sort_values(['quote_date', 'expiration'])
-        single_pos_len = df_side.shape[1] - 1 if i == 0 else single_pos_len
+        single_option_col_count = df_side.shape[1] - 1 if i == 0 else single_option_col_count
         df = df_side if i == 0 else pd.merge(df, df_side, on=['quote_date', 'expiration'], how='inner')
 
     for i in range(count):
@@ -127,13 +128,16 @@ def backtests():
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
 
     save_test(df, types, sides, [disc_prc,hedge_usd],weeks)
-    lines_in_plot = int(df.shape[1] / single_pos_len)
+    profit_lines_in_plot = int(df.shape[1] / single_option_col_count)
     trades = len(df)
     summa = df['sum'].iloc[-1]
     avg = summa / trades
     txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f,>=%.2f'\
         .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_profit)
-    plot(df,txt,lines_count=lines_in_plot,draw_or_show=draw_or_show,fn=fn)
+    if read_entry('backtest','join_stock') == 'y':
+        df = add_stock(df)
+    plot(df,txt,lines_count=profit_lines_in_plot,draw_or_show=draw_or_show,fn=fn)
+
     if draw_or_show == 'draw':
         input('pause >')
 

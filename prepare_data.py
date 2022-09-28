@@ -45,8 +45,8 @@ def process_cboe_source_do(ticker,year, option_type):
     print('saved %s' % fn)
 def process_cboe_source(ticker,year=None,option_type=None):
     process_cboe_source_do(ticker,year,'P')
-    print('process Call type skipped')
-    # process_cboe_source_do(ticker,year,'C')
+    # print('process Call type skipped')
+    process_cboe_source_do(ticker,year,'C')
 
 def download_yahoo(bd,ticker):
     ed = datetime.today().strftime('%Y-%m-%d')
@@ -81,7 +81,7 @@ def intraday(date,bottom=None,top=None):
 def td(d):
     return d.days
 
-def get_sftp_cboe(month=None,days_arg=None):
+'''def get_sftp_cboe(month=None,days_arg=None):
     days,count,localpath,filename = 0,0,'',''
     if month is None or days_arg is None:
         now = datetime.now()
@@ -125,6 +125,7 @@ def get_sftp_cboe(month=None,days_arg=None):
     system('ls %s|tail -n 5' % d)
 
     print('done')
+'''
 def add_weekday(ticker,y=None):
     if y is None:
         y = 2022
