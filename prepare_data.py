@@ -62,6 +62,7 @@ def download_yahoo(bd,ticker):
         exit('http error: not found')
 
     string_as_file = StringIO(html)
+    # noinspection PyTypeChecker
     arr = pd.read_csv(string_as_file)
     # SPY = arr.rename(columns={'Date':'date', 'Open':'o', 'High':'h', 'Low':'l', 'Close':'c', 'Adj Close':'vlt', 'Volume':'underlying_bid_1545'})
     arr.to_csv(fn, index=False)
