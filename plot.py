@@ -29,18 +29,14 @@ def custom_plot_(df,a,b):
     plt.show()
     plt.pause(0.0001)
 
-def plot(df,txt,lines_count,draw_or_show,fn):
-    x_axis = 'quote_date'
-    if lines_count == 1:
-        dfp = df[[x_axis, 'sum_0']]
-    else:
-        cols = '%s,' % x_axis
-        for i in range(lines_count):
-            cols = cols + 'sum_%d,' % i
-        cols = cols + 'sum'
-        if 'Close' in df.columns:
-            cols = cols + ',Close'
-        dfp = df[cols.split(',')]
+def plot(df,x_axis,txt,lines_count,draw_or_show,fn):
+    cols = '%s,' % x_axis
+    for i in range(lines_count):
+        cols = cols + 'sum_%d,' % i
+    cols = cols + 'sum'
+    if 'Close' in df.columns:
+        cols = cols + ',Close'
+    dfp = df[cols.split(',')]
     dfp = dfp.set_index(x_axis)
     ax = dfp.plot(figsize=(11, 7), title=txt)
     xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')

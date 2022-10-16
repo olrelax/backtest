@@ -185,7 +185,8 @@ def loc_mon_fri(ticker,y,opt_type,wks):
 
 def make_long_file(start_year):
     df_all = None
-    for step in range(2022 - start_year + 1):
+    now = datetime.now()
+    for step in range(now.year - start_year + 1):
         y = start_year + step
         y_opts = read_opt('QQQ',y,'P')
         df_all = y_opts if step == 0 else df_all.append(y_opts,ignore_index=True)
@@ -207,11 +208,13 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
         add_weekday(ticker=arg_1,y=int(arg_2))
     elif ch == 'mf':
         ticker = arg_1
+        start_year = int(arg_3)
         fun = loc_mon_fri
-        weeks = 1 if arg_3 =='' else int(arg_3)
-        w = fun(ticker=arg_1,y=2020,opt_type=arg_2,wks=weeks)
-        w = w.append(fun(ticker=arg_1,y=2021,opt_type=arg_2,wks=weeks),ignore_index=True)
-        w = w.append(fun(ticker=arg_1,y=2022,opt_type=arg_2,wks=weeks),ignore_index=True)
+        weeks = 1   #
+        w = fun(ticker=arg_1,y=start_year,opt_type=arg_2,wks=weeks)
+        for i in range(2022 - start_year):
+            w = pd.concat([w,fun(ticker=arg_1,y=1+start_year+i,opt_type=arg_2,wks=weeks)],ignore_index=True)
+        # w = pd.concat([w,fun(ticker=arg_1,y=2022,opt_type=arg_2,wks=weeks)],ignore_index=True)
         w = join_stock(w,ticker)
         fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,arg_2,weeks)
         # noinspection PyTypeChecker

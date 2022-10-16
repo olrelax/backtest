@@ -15,8 +15,12 @@ def read_opt_file(ofn):
     return df
 def normalize(df):
     stock = 'Close'
-    opt_min = df[['sum_0', 'sum_1', 'sum']].to_numpy().min()
-    opt_max = df[['sum_0', 'sum_1', 'sum']].to_numpy().max()
+    if 'sum_1' in df.columns:
+        cols = ['sum_0', 'sum_1', 'sum']
+    else:
+        cols = ['sum_0', 'sum']
+    opt_min = df[cols].to_numpy().min()
+    opt_max = df[cols].to_numpy().max()
     under_min = df[stock].to_numpy().min()
     under_max = df[stock].to_numpy().max()
     df[stock] = df[stock] * (opt_max - opt_min) / (under_max - under_min)
@@ -150,7 +154,8 @@ def add_stock(out_df):
     stock = stock.rename(columns={'Date':'quote_date'})
     df = pd.merge(stock,out_df,on='quote_date',how='outer')
     df['sum_0'] = df['sum_0'].fillna(method='ffill')
-    df['sum_1'] = df['sum_1'].fillna(method='ffill')
+    if 'sum_1' in df.columns:
+        df['sum_1'] = df['sum_1'].fillna(method='ffill')
     df['sum'] = df['sum'].fillna(method='ffill')
 
     return normalize(df)

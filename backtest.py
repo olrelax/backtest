@@ -22,12 +22,9 @@ def show(df, stop=True):
     if stop:
         exit()
 
-def save_test(df, types, sides, params,exp_weekday):
+def save_test(df):
     global fn
     fn = datetime.strftime(datetime.now(), '%d-%-H-%M-%S')
-    # ini = open('../out/i-%s.txt' % fn, 'w')
-    # print('type {},sides{},params{},{}'.format(types, sides, params,exp_weekday), file=ini)
-    # ini.close()
     # noinspection PyTypeChecker
     df.to_csv('../out/e-%s.csv' % fn, index=False)
 
@@ -44,7 +41,7 @@ def get_name(var):
     return [var_name for var_name, var_val in callers_local_vars if var_val is var]
 
 def numerate(df,i):
-    return df.rename(columns={'strike': 'strike_%d' % i, 'underlying_open': 'under_open_%d' % i,
+    return df.rename(columns={'strike': 'strike_%d' % i, 'underlying_open': 'under_open_%d' % i,'under_out': 'under_out_%d' % i,
                           'open': 'open_%d' % i,'out': 'out_%d' % i,
                           'margin': 'margin_%d' % i,'profit': 'profit_%d' % i})
 
@@ -61,7 +58,6 @@ def zero_or_not(diff):
     return 1. if diff > 0 else 0
 
 def in2exp(params, weeks,side, opt_type,i):
-
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
     opts_fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,opt_type[0],weeks)
@@ -76,7 +72,7 @@ def in2exp(params, weeks,side, opt_type,i):
         subset=['quote_date', 'expiration'])[['quote_date', 'expiration', 'strike', 'underlying_open', 'open']]
     opt_prefix = 'ask' if side == 'short' else 'bid'
     under_prefix = 'bid' if side == 'short' else 'ask'
-    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_bid_eod','%s_eod' % opt_prefix]].rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'}).copy().reset_index(drop=True)
+    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_%s_eod' % under_prefix,'%s_eod' % opt_prefix]].rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'}).copy().reset_index(drop=True)
     sign = 1. if opt_type[0] == 'P' else -1.
     df_out['diff'] = (df_out['strike'] - df_out['under_out']) * sign
     df_out['k'] = pd.Series(map(zero_or_not,df_out['diff'])).to_frame()     # make out price 0.0 if not executed on expiration
@@ -127,16 +123,16 @@ def backtests():
 
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
 
-    save_test(df, types, sides, [disc_prc,hedge_usd],weeks)
+    save_test(df)
     profit_lines_in_plot = int(df.shape[1] / single_option_col_count)
     trades = len(df)
     summa = df['sum'].iloc[-1]
     avg = summa / trades
-    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f,>=%.2f'\
-        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_profit)
+    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f, min %.2f, max %.2f'\
+        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_profit,max_profit)
     if read_entry('backtest','join_stock') == 'y':
         df = add_stock(df)
-    plot(df,txt,lines_count=profit_lines_in_plot,draw_or_show=draw_or_show,fn=fn)
+    plot(df,'quote_date',txt,lines_count=profit_lines_in_plot,draw_or_show=draw_or_show,fn=fn)
 
     if draw_or_show == 'draw':
         input('pause >')
