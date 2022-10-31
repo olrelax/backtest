@@ -50,6 +50,7 @@ def process_cboe_source(ticker,year=None,option_type=None):
     process_cboe_source_do(ticker,year,'C')
 
 def download_yahoo(bd,ticker):
+
     ed = datetime.today().strftime('%Y-%m-%d')
     b = time.mktime(datetime.strptime(bd, '%Y-%m-%d').timetuple())
     e = time.mktime(datetime.strptime(ed, '%Y-%m-%d').timetuple())
