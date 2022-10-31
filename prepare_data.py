@@ -38,7 +38,8 @@ def process_cboe_source_do(ticker,year, option_type):
         if i == 0:
             rf = df.copy()
         else:
-            rf = rf.append(df.copy())
+            # rf = rf.append(df.copy())
+            rf = pd.concat([rf,df.copy()])
         i += 1
     fn = '../data/%s/%s_CBOE_%s_%s.csv' % (ticker,ticker,year,option_type)
     rf.to_csv(fn,index=False)
@@ -208,15 +209,16 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
         add_weekday(ticker=arg_1,y=int(arg_2))
     elif ch == 'mf':
         ticker = arg_1
-        start_year = int(arg_3)
+        start_year = int(arg_2)
+        opt_type = arg_3
         fun = loc_mon_fri
         weeks = 1   #
-        w = fun(ticker=arg_1,y=start_year,opt_type=arg_2,wks=weeks)
+
+        w = fun(ticker=arg_1,y=start_year,opt_type=opt_type,wks=weeks)
         for i in range(2022 - start_year):
-            w = pd.concat([w,fun(ticker=arg_1,y=1+start_year+i,opt_type=arg_2,wks=weeks)],ignore_index=True)
-        # w = pd.concat([w,fun(ticker=arg_1,y=2022,opt_type=arg_2,wks=weeks)],ignore_index=True)
+            w = pd.concat([w,fun(ticker=arg_1,y=1+start_year+i,opt_type=opt_type,wks=weeks)],ignore_index=True)
         w = join_stock(w,ticker)
-        fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,arg_2,weeks)
+        fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,opt_type,weeks)
         # noinspection PyTypeChecker
         w.to_csv(fn,index=False)
 def deb():
