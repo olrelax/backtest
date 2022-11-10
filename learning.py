@@ -32,5 +32,21 @@ def finam():
     file2.write('\n</body></html>\n')
     file2.close()
 
+def learn():
+    data = pd.DataFrame({'x1': range(80, 73, - 1),  # Create pandas DataFrame
+                         'x2': [1, 2, 3, 4, 5, 6, 7],
+                         'x3': range(27, 20, - 1)})
+    data = data.loc[(data['x1'] > 75) & (data['x1'] < 80)]
+    for r,s in data.iterrows():
+        c_min = 10000
+        i_min = ''
+        for i,c in s.items():
+            if c < c_min:
+                i_min = i
+                c_min = c
+        print(s)
+        print('min: {} {}'.format(i_min,c_min))
+learn()
 
-finam()
+
+

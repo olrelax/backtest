@@ -76,7 +76,8 @@ def add_wrk_days3(dt):
 def add_wrk_days4(dt):
     global exp_in
     return add_work_days(dt,exp_in)
-
+def print_df(df):
+    None
 def lowest_week_price(tick,enter_weekday,show_rows,yr=None):
     # df = pd.read_csv('../data/%s/%s-yahoo_wkd.csv' % (tick,tick))[['Date','Open','Low','Close','wkd']]
     df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick))[['Date','Open','Low','Close']]
@@ -116,9 +117,23 @@ def lowest_week_price(tick,enter_weekday,show_rows,yr=None):
         df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
     df = df.sort_values('dd_exp_prc')[['Date','Open','Low1','Low2',	'Low3','Low4','Close4','dd0','dd1','dd2','dd3','dd4','dd_Low_max','dd_Low_prc','dd_exp_max','dd_exp_prc','dd_exp','Date1','Date2','Date3','Date4']]
 
-    df = df[-20:]
-    dfp = df[['Date','dd_Low_prc','dd_exp_prc']]
-    print(dfp.tail(show_rows))
+    df = df[-10:]
+#    df = df[['Date','dd_Low_prc','dd_exp_prc']]
+    df['worst_day'] = ''
+    df['worst_dd'] = 0.
+    #i_worst_day = df.columns.get_loc('worst_day')
+    #i_worst_dd = df.columns.get_loc('worst_dd')
+    for r,s in df[['dd0','dd1','dd2','dd3','dd4']].iterrows():
+        dd_max = 0
+        i_max = ''
+        for i,dd in s.items():
+            if dd > dd_max:
+                i_max = i
+                dd_max = dd
+        df.at[r,'worst_day'] = i_max
+    print(df[['Date','dd_Low_prc','dd_exp_prc','worst_day']].tail(show_rows))
+    save(df)
+
 def max_move(tick,enter_weekday,show_rows,yr=None,sort='Low'):
     df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
     df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
