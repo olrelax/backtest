@@ -41,7 +41,7 @@ def get_name(var):
     return [var_name for var_name, var_val in callers_local_vars if var_val is var]
 
 def numerate(df,i):
-    return df.rename(columns={'strike': 'strike_%d' % i, 'underlying_open': 'under_open_%d' % i,'under_out': 'under_out_%d' % i,
+    return df.rename(columns={'strike': 'strike_%d' % i, 'disc':'disc_%d' % i,'underlying_open': 'under_open_%d' % i,'under_out': 'under_out_%d' % i,
                           'open': 'open_%d' % i,'out': 'out_%d' % i,
                           'margin': 'margin_%d' % i,'profit': 'profit_%d' % i})
 
@@ -54,8 +54,8 @@ def make_delta_column(df_in,opt_type,params,i):
     df_in['delta'] = (df_in['underlying_open'] * k + hedge_shift - df_in['strike']).abs() * 10.0
     df_in['delta'] = df_in['delta'].astype(int)
     return df_in
-def zero_or_not(diff):
-    return 1. if diff > 0 else 0
+def zero_or_not(disc):
+    return 1. if disc > 0 else 0
 
 def in2exp(params, weeks,side, opt_type,i):
     bd = datetime.strptime(start_date, '%Y-%m-%d')
@@ -74,8 +74,8 @@ def in2exp(params, weeks,side, opt_type,i):
     under_prefix = 'bid' if side == 'short' else 'ask'
     df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_%s_eod' % under_prefix,'%s_eod' % opt_prefix]].rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'}).copy().reset_index(drop=True)
     sign = 1. if opt_type[0] == 'P' else -1.
-    df_out['diff'] = (df_out['strike'] - df_out['under_out']) * sign
-    df_out['k'] = pd.Series(map(zero_or_not,df_out['diff'])).to_frame()     # make out price 0.0 if not executed on expiration
+    df_out['disc'] = (df_out['strike'] - df_out['under_out']) * sign
+    df_out['k'] = pd.Series(map(zero_or_not,df_out['disc'])).to_frame()     # make out price 0.0 if not executed on expiration
     df_out['out'] = (df_out['out_tmp'] * df_out['k'])
     df_out = df_out.drop(columns=['k','out_tmp'])
     df = pd.merge(df_in, df_out, on=['expiration', 'strike']).reset_index(drop=True)
@@ -103,6 +103,7 @@ def backtest(types,sides,params,weeks):
         df['sum_%d' % i] = df['sum_%d' % i].fillna(method='ffill')
     for i in range(count):
         df['sum'] = df['sum_%d' % i] if i == 0 else df['sum'] + df['sum_%d' % i]
+        df['spread'] = df['margin_%d' % i] if i == 0 else df['spread'] + df['margin_%d' % i]
     return df
 
 
@@ -128,8 +129,10 @@ def backtests():
     trades = len(df)
     summa = df['sum'].iloc[-1]
     avg = summa / trades
-    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum %.2f, avg %.2f, min %.2f, max %.2f'\
-        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_price,max_price)
+    min_spread = df['spread'].min()
+
+    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum profit %.2f, avg profit %.2f, min/max sell price %.2f/%.2f,min_spread %.2f'\
+        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_price,max_price,min_spread)
     if read_entry('backtest','join_stock') == 'y':
         df = add_stock(df)
     plot(df,'quote_date',txt,lines_count=profit_lines_in_plot,draw_or_show=draw_or_show,fn=fn)

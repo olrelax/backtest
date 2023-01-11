@@ -228,8 +228,6 @@ def deb():
 
 
 def select_task():
-    # process_data('r','QQQ',2022)
-    #process_data('mf','ddd','P')
     chars = read_entry('prepare','chars')
     arg1 = read_entry('prepare','arg1')
     arg2 = read_entry('prepare','arg2')
