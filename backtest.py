@@ -13,6 +13,7 @@ algo = ''
 comm = 0
 min_price = 0
 max_price = 0
+min_spread_price = 0
 def show(df, stop=True):
     name = get_name(df)[0]
     print('-----------------%s------------' % name)
@@ -97,7 +98,10 @@ def backtest(types,sides,params,weeks):
         df_side = df_side.sort_values(['quote_date', 'expiration'])
         single_option_col_count = df_side.shape[1] - 1 if i == 0 else single_option_col_count
         df = df_side if i == 0 else pd.merge(df, df_side, on=['quote_date', 'expiration'], how='inner')
-
+    for i in range(count):
+        df['spread'] = df['margin_%d' % i] if i == 0 else df['spread'] + df['margin_%d' % i]
+    if min_spread_price > 0:
+        df = df.loc[df['spread'] >= min_spread_price]
     for i in range(count):
         df['sum_%d' % i] = df['profit_%d' % i].cumsum(axis=0)
         df['sum_%d' % i] = df['sum_%d' % i].fillna(method='ffill')
@@ -108,7 +112,7 @@ def backtest(types,sides,params,weeks):
 
 
 def backtests():
-    global algo, before_date, start_date, fn,ticker,comm,min_price,max_price
+    global algo, before_date, start_date, fn,ticker,comm,min_price,max_price,min_spread_price
     weeks = 1
     draw_or_show = 'show'
     types = read_entry('backtest','types').split(',')
@@ -120,6 +124,7 @@ def backtests():
     hedge_usd = int(read_entry('backtest','hedge_usd'))
     comm = float(read_entry('backtest','comm'))
     min_price = float(read_entry('backtest','min_price'))
+    min_spread_price = float(read_entry('backtest','min_spread_price'))
     max_price = float(read_entry('backtest','max_price'))
 
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
@@ -130,9 +135,9 @@ def backtests():
     summa = df['sum'].iloc[-1]
     avg = summa / trades
     min_spread = df['spread'].min()
-
-    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum profit %.2f, avg profit %.2f, min/max sell price %.2f/%.2f,min_spread %.2f'\
-        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_price,max_price,min_spread)
+    min_max_str = '' if min_price == 0 and max_price == 0 else 'min/max price %.2f/%.2f,' % (min_price,max_price)
+    txt = '{} {}, type {}, side {},param {},\ntrades {}, sum profit %.2f, avg profit %.2f,%s min_spread_price %.2f'\
+        .format(ticker, algo, types, sides, [disc_prc,hedge_usd], trades) % (summa,avg,min_max_str,min_spread)
     if read_entry('backtest','join_stock') == 'y':
         df = add_stock(df)
     plot(df,'quote_date',txt,lines_count=profit_lines_in_plot,draw_or_show=draw_or_show,fn=fn)
