@@ -15,10 +15,10 @@ def read_opt_file(ofn):
     return df
 def normalize(df):
     stock = 'Close'
-    if 'sum_1' in df.columns:
-        cols = ['sum_0', 'sum_1', 'sum']
+    if 'opt_sum_1' in df.columns:
+        cols = ['opt_sum_0', 'opt_sum_1', 'opt_sum']
     else:
-        cols = ['sum_0', 'sum']
+        cols = ['opt_sum_0', 'opt_sum']
     opt_min = df[cols].to_numpy().min()
     opt_max = df[cols].to_numpy().max()
     under_min = df[stock].to_numpy().min()
@@ -37,7 +37,6 @@ def read_opt(ticker,year,opt_type):
     fn = '../data/%s/%s_CBOE_%d_%s.csv' % (ticker,ticker,year,opt_type)
     try:
         opts = pd.read_csv(fn, index_col=0)
-        #,parse_dates=['quote_date','expiration'])
         opts['quote_date'] = pd.to_datetime(opts['quote_date'], format='%Y-%m-%d')
         opts['expiration'] = pd.to_datetime(opts['expiration'], format='%Y-%m-%d')
     except FileNotFoundError:
@@ -143,19 +142,6 @@ def read_entry(section, entry_name):
         parser.read('config.ini')
     a = parser.get(section, entry_name)
     return a
+def flt(ch):
+    return float(ch) if len(ch)>0 else 0.0
 
-def add_stock(out_df):
-    fn = '../data/QQQ/QQQ-yahoo.csv'
-    bd = out_df['quote_date'].iloc[0]
-    ed = out_df['quote_date'].iloc[-1]
-    stock = pd.read_csv(fn)
-    stock['Date'] = pd.to_datetime(stock['Date'])
-    stock = stock.loc[(stock['Date'] <= ed) & (stock['Date'] >= bd)]
-    stock = stock.rename(columns={'Date':'quote_date'})
-    df = pd.merge(stock,out_df,on='quote_date',how='outer')
-    df['sum_0'] = df['sum_0'].fillna(method='ffill')
-    if 'sum_1' in df.columns:
-        df['sum_1'] = df['sum_1'].fillna(method='ffill')
-    df['sum'] = df['sum'].fillna(method='ffill')
-
-    return normalize(df)

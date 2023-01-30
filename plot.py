@@ -29,13 +29,19 @@ def custom_plot_(df,a,b):
     plt.show()
     plt.pause(0.0001)
 
-def plot(df,x_axis,txt,lines_count,draw_or_show,fn):
+def plot(df,x_axis,txt,lines_count,draw_or_show,fn,trade_stock):
     cols = '%s,' % x_axis
-    for i in range(lines_count):
-        cols = cols + 'sum_%d,' % i
-    cols = cols + 'sum'
+    if lines_count > 1:
+        for i in range(lines_count):
+            cols = cols + 'opt_sum_%d,' % i
+        cols = cols + 'opt_sum'
+    else:
+        cols = cols + 'opt_sum'
     if 'Close' in df.columns:
         cols = cols + ',Close'
+    if 'under_sum' in df.columns and trade_stock == 'y':
+        cols = cols + ',under_sum'
+        cols = cols + ',sum'
     dfp = df[cols.split(',')]
     dfp = dfp.set_index(x_axis)
     ax = dfp.plot(figsize=(11, 7), title=txt)

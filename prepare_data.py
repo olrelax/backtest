@@ -160,6 +160,8 @@ def save(dtf,arg_name=None):
 
 def loc_weekly_exp_cboe(ticker,y,t,exact=True):
     o = read_opt(ticker,y,t)
+    if o is None:
+        exit()
     o['quote_date'] = pd.to_datetime(o['quote_date'])
     o['expiration'] = pd.to_datetime(o['expiration'])
     d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']]
@@ -179,6 +181,8 @@ def loc_weekly_exp_cboe(ticker,y,t,exact=True):
 
 def loc_mon_fri(ticker,y,opt_type,wks):
     o = read_opt(ticker,y,opt_type)
+    if o is None:
+        exit()
     days_to_exp = 4+7*(wks-1)
     d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']].sort_values(['quote_date','expiration'])
     d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == days_to_exp) & (d['weekday'] == 1))]
@@ -200,8 +204,20 @@ def join_stock(df,ticker):
     stock = pd.read_csv(sfn,parse_dates=['Date'])[['Date','Open','High','Low','Close']].rename(columns={'Date':'quote_date'})
     opt = pd.read_csv(ofn,parse_dates=['quote_date']) if df is None else df
     df = pd.merge(opt,stock,on='quote_date').rename(columns={'Open':'underlying_open','High':'underlying_high','Low':'underlying_low','Close':'underlying_close'})
-    'Open	High	Low	Close'
     return df
+def repair(ticker,opt_type):
+    fn = '../data/%s/%s_mon_fri_%s_1.csv' % (ticker,ticker,opt_type)
+    df = pd.read_csv(fn)
+    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
+    df_z = df.loc[df['underlying_bid_eod'] == 0].copy()
+    df_z['underlying_bid_eod'] = df_z['underlying_close']
+    df_z['underlying_ask_eod'] = df_z['underlying_close']
+    df_nz = df.loc[df['underlying_bid_eod'] > 0]
+    df = pd.concat([df_nz,df_z],ignore_index=True)
+    df = df.sort_values(['quote_date','expiration','strike'])
+    df.to_csv(fn,index=False)
+
 def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
     if ch == 'y':
         download_yahoo('2007-01-01',arg_1)
@@ -222,6 +238,8 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
         fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,opt_type,weeks)
         # noinspection PyTypeChecker
         w.to_csv(fn,index=False)
+    elif ch == 'repair':
+        repair(ticker=arg_1,opt_type=arg_3)
 def deb():
     d = '../data/SPY_2022_CBOE_SRC/'
     system('ls %s|tail -n 5' % d)
