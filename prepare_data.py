@@ -2,15 +2,13 @@ import pandas as pd
 from os import walk
 from dateutil.relativedelta import *
 from datetime import datetime
-from au import add_days,read_opt,read_entry
+from au import read_opt,read_entry
 from os import system
 import time
 import urllib.request
 import urllib.error
 from io import StringIO
 import ssl
-#import paramiko
-import zipfile
 import inspect
 
 def process_cboe_source_do(ticker,year, option_type):
@@ -44,10 +42,12 @@ def process_cboe_source_do(ticker,year, option_type):
     fn = '../data/%s/%s_CBOE_%s_%s.csv' % (ticker,ticker,year,option_type)
     rf.to_csv(fn,index=False)
     print('saved %s' % fn)
-def process_cboe_source(ticker,year=None,option_type=None):
-    process_cboe_source_do(ticker,year,'P')
-    # print('process Call type skipped')
-    process_cboe_source_do(ticker,year,'C')
+def process_cboe_source(ticker,year=None,option_type='P,C'):
+    if option_type == 'P,C':
+        process_cboe_source_do(ticker,year,'P')
+        process_cboe_source_do(ticker,year,'C')
+    elif option_type == 'PC':
+        process_cboe_source_do(ticker,year,'PC')
 
 def download_yahoo(bd,ticker):
 
@@ -129,12 +129,12 @@ def td(d):
 
     print('done')
 '''
-def add_weekday(ticker,y=None):
+def add_weekday(ticker,y=None,option_type='P,C'):
     if y is None:
         y = 2022
 
-    def add_weekday_do(year, option_type):
-        fn = '../data/%s/%s_CBOE_%s_%s.csv' % (ticker,ticker,year, option_type)
+    def add_weekday_do(year, opt_type):
+        fn = '../data/%s/%s_CBOE_%s_%s.csv' % (ticker,ticker,year, opt_type)
         print('add weekday %s...' % fn)
         df = pd.read_csv(fn)
         df['quote_date'] = pd.to_datetime(df['quote_date'])
@@ -144,9 +144,12 @@ def add_weekday(ticker,y=None):
         df['days_to_exp'] = pd.Series(map(td, (df['expiration'] - df['quote_date'])))
         df.to_csv('%s' % fn, index=False)
         print('done wkd %s' % fn)
+    if option_type=='P,C':
+        add_weekday_do(y,'P')
+        add_weekday_do(y, 'C')
+    else:
+        add_weekday_do(y,'PC')
 
-    add_weekday_do(y,'P')
-    add_weekday_do(y, 'C')
 
 
 def get_name(var):
@@ -184,7 +187,7 @@ def loc_mon_fri(ticker,y,opt_type,wks):
     if o is None:
         exit()
     days_to_exp = 4+7*(wks-1)
-    d = o[['quote_date','expiration','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']].sort_values(['quote_date','expiration'])
+    d = o[['quote_date','expiration','option_type','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']].sort_values(['quote_date','expiration','strike','option_type'])
     d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == days_to_exp) & (d['weekday'] == 1))]
     print('%s %dw%d weeks done' % (opt_type,y,wks))
     return d
@@ -222,8 +225,8 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
     if ch == 'y':
         download_yahoo('2007-01-01',arg_1)
     elif ch == 'r':
-        process_cboe_source(ticker=arg_1,year=int(arg_2))
-        add_weekday(ticker=arg_1,y=int(arg_2))
+        process_cboe_source(ticker=arg_1,year=int(arg_2),option_type=arg_3)   # 'PC' for single file for both types, or 'P,C' for 2 separate files for each type
+        add_weekday(ticker=arg_1,y=int(arg_2),option_type=arg_3)
     elif ch == 'mf':
         ticker = arg_1
         start_year = int(arg_2)

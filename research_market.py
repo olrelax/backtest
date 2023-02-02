@@ -162,14 +162,13 @@ def max_move(tick,enter_weekday,show_rows,yr=None,sort='Low'):
     df1['prc_c_c'] = 100*(df1['delta_c_c'])/df1['Close_x']
 
     df_down = df1[['Date_x','Open','Date_y','Low','Close_y','prc_low','prc_close']]
-    save(df_down)
-    # df_up = df1[['Date_x','Open','Date_y','High','Close_y','prc_high','prc_close']]
+    df_up = df1[['Date_x','Open','Date_y','High','Close_y','prc_high','prc_close']]
     pd.set_option('display.precision', 2)
     down = df_down.sort_values(sort)[-show_rows:]
-    # up = df_up.sort_values(sort)[:show_rows]
-    # print('------------UP---------------')
-    # print(up)
-    # print('------------DOWN---------------')
+    up = df_up.sort_values(sort)[:show_rows]
+    print('------------UP---------------')
+    print(up)
+    print('------------DOWN---------------')
     print(down)
 
 
@@ -182,6 +181,6 @@ if __name__ == '__main__':
     year = read_entry('research','year')
 #    day_timing = ['Open','Close']
     arg_sort = 'prc_close'
-    # max_move(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)
-    lowest_week_price(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year)
+    max_move(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)
+    # lowest_week_price(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year)
     # single_opt(opt_date='2020-03-20',strike=177)

@@ -16,6 +16,8 @@ def save(dtf,arg_name=None,stop=False):
         exit()
 
 
+
+
 def custom_plot(df,x,y):
     df = df.reset_index(drop=True)
     # dfp.plot(x='quote_datetime',figsize=(11, 7),subplots=True)
@@ -39,18 +41,18 @@ def plot(df,x_axis,txt,lines_count,draw_or_show,fn,trade_stock):
         cols = cols + 'opt_sum'
     if 'Close' in df.columns:
         cols = cols + ',Close'
-    if 'under_sum' in df.columns and trade_stock == 'y':
+    if 'under_sum' in df.columns and trade_stock in ('l','s'):
         cols = cols + ',under_sum'
         cols = cols + ',sum'
     dfp = df[cols.split(',')]
     dfp = dfp.set_index(x_axis)
     ax = dfp.plot(figsize=(11, 7), title=txt)
     xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')
-    ax.set_xticks(xtick, minor=True)
+    ax.set_xticks(xtick, minor=False)
     ax.grid('on', which='minor')
     ax.grid('on', which='major')
-    #ax.set_ylim(ylim_bottom, ylim_top)
-    plt.savefig('../out/c-%s.png' % fn)
+    # # ax.set_ylim(ylim_bottom, ylim_top)
+    plt.savefig('../out/%s-p.png' % fn)
 
     if draw_or_show == 'draw':
         plt.draw()
