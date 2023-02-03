@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime
 import inspect
-from au import read_entry,flt,normalize
+from au import read_entry,flt,scale_stock
 from plot import plot
 count = 0
 single_option_col_count = 0
@@ -9,12 +9,14 @@ ticker = ''
 start_date = ''
 before_date = ''
 fn = ''
-algo = ''
 comm = 0
-min_price = 0
 max_price = 0
-min_spread_price_limit = 0
-trade_stock = ''
+min_trade_price_limit = 0
+condition = 0
+
+stock = ''
+dd_count,dd_max_count,max_trades,trades = 0, 0, 0, 0
+shrink_to = 0
 def show(df, stop=True):
     name = get_name(df)[0]
     print('-----------------%s------------' % name)
@@ -49,23 +51,24 @@ def numerate(df,i):
 
 def get_sold(price):
     return 0 if price < 0.0101 else price
+
+
 def add_stock_chart(out_df):
     yfn = '../data/QQQ/QQQ-yahoo.csv'
     bd = out_df['quote_date'].iloc[0]
     ed = out_df['quote_date'].iloc[-1]
-    stock = pd.read_csv(yfn)
-    stock['Date'] = pd.to_datetime(stock['Date'])
-    stock = stock.loc[(stock['Date'] <= ed) & (stock['Date'] >= bd)]
-    stock = stock.rename(columns={'Date':'quote_date'})
-    df = pd.merge(stock,out_df,on='quote_date',how='outer')
-    df['opt_sum_0'] = df['opt_sum_0'].fillna(method='ffill')
-    if 'opt_sum_1' in df.columns:
-        df['opt_sum_1'] = df['opt_sum_1'].fillna(method='ffill')
-    df['opt_sum'] = df['opt_sum'].fillna(method='ffill')
-    if trade_stock in ('s','l'):
-        df['under_sum'] = df['under_sum'].fillna(method='ffill')
-    df['sum'] = df['sum'].fillna(method='ffill')
-    return normalize(df)
+    stock_df = pd.read_csv(yfn)
+    stock_df['Date'] = pd.to_datetime(stock_df['Date'])
+    stock_df = stock_df.loc[(stock_df['Date'] <= ed) & (stock_df['Date'] >= bd)]
+    stock_df = stock_df.rename(columns={'Date':'quote_date'})
+    df = pd.merge(stock_df,out_df,on='quote_date',how='outer')
+#    for i in range(count):
+#        df['opt_sum_%d' % i] = df['opt_sum_%d' % i].fillna(method='ffill')
+#    df['opt_sum'] = df['opt_sum'].fillna(method='ffill')
+#    if trade_stock in ('s','l'):
+#        df['under_sum'] = df['under_sum'].fillna(method='ffill')
+#    df['sum'] = df['sum'].fillna(method='ffill')
+    return df
 
 def make_delta_column(df_in,opt_type,params,i):
     k = (100 + params[0] * (1 if opt_type[0] == 'C' else -1)) / 100
@@ -74,25 +77,11 @@ def make_delta_column(df_in,opt_type,params,i):
     df_in['delta'] = df_in['delta'].astype(int)
     return df_in
 
-def greater_than_zero(value):
-    return 1. if value > 0 else 0
+def greater_than_condition(value):
+    return 1. if value > condition else 0
 
-"""
-def in2exp2(params, weeks, side, opt_type, i):
-    # select strike using absolute shift from stock price
-    bd = datetime.strptime(start_date, '%Y-%m-%d')
-    ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
-    opts_fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker, ticker, opt_type[0], weeks)
-    df = pd.read_csv(opts_fn)  # ,parse_dates=['quote_date','expiration'])
-    df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
-    df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
-    df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
-    df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,params=params,i=i)
-    df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
-    df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
-        subset=['quote_date', 'expiration'])[['quote_date', 'expiration', 'strike', 'underlying_open', 'open']]
-"""
 def in2exp(params, weeks,side, opt_type,i):
+    global condition
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
     opts_fn = '../data/%s/%s_mon_fri_PC_%d.csv' % (ticker,ticker,weeks)
@@ -100,7 +89,7 @@ def in2exp(params, weeks,side, opt_type,i):
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
-    df = df.loc[df['option_type']==opt_type[0]]
+    df = df.loc[df['option_type'] == opt_type[0]]
     df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,params=params,i=i)
     df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
     df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
@@ -110,45 +99,53 @@ def in2exp(params, weeks,side, opt_type,i):
     df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_%s_eod' % under_prefix,'%s_eod' % opt_prefix]].rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'}).copy().reset_index(drop=True)
     sign = 1. if opt_type[0] == 'P' else -1.
     df_out['overstrike'] = (df_out['strike'] - df_out['under_out']) * sign
-    df_out['k'] = pd.Series(map(greater_than_zero,df_out['overstrike'])).to_frame()     # make out price 0.0 if not executed on expiration
+    condition = 0
+    df_out['k'] = pd.Series(map(greater_than_condition,df_out['overstrike'])).to_frame()     # make out price 0.0 if not executed on expiration
     df_out['out'] = (df_out['out_tmp'] * df_out['k'])
     df_out = df_out.drop(columns=['k','out_tmp'])
     df = pd.merge(df_in, df_out, on=['expiration', 'strike']).reset_index(drop=True)
     df['margin'] = (df['open'] - df['out']) * (1. if side == 'short' else -1.)
     df['profit'] = df['margin'].sub(comm)
-#    if i == 0:
-#        df['k'] = pd.Series(map(greater_than_zero,df['margin'])).to_frame()
-#        df['positive_margin'] = df['margin']*df['k']
-#        df = df.drop(columns=['k'])
-    if i == 0:
-        if min_price > 0:
-            df = df.loc[df['open'] >= min_price]
-        if max_price > 0:
-            df = df.loc[df['open'] <= max_price]
     df = numerate(df,i)
     return df
 def backtest(types,sides,params,weeks):
-    global count, single_option_col_count
+    global count, min_trade_price_limit,max_trades,trades,condition,dd_max_count,dd_count
     count = min(len(sides), len(params),len(types))
     df = None
     for i in range(count):
         df_side = in2exp(params,weeks, sides[i],types[i], i)
         df_side = df_side.sort_values(['quote_date', 'expiration'])
-        single_option_col_count = df_side.shape[1] - 1 if i == 0 else single_option_col_count
         df = df_side if i == 0 else pd.merge(df, df_side, on=['quote_date', 'expiration'], how='inner')
+    max_trades = len(df)
+    df = add_stock_chart(df)
     if count > 1:
         for i in range(count):
-            df['spread_price'] = df['margin_%d' % i] if i == 0 else df['spread_price'] + df['margin_%d' % i]
-        if min_spread_price_limit > 0:
-            df = df.loc[df['spread_price'] >= min_spread_price_limit].copy()
+            df['opt_trade_price'] = df['open_0'] if i == 0 else df['opt_trade_price'] - df['open_%d' % i]
+    df['raw_profit'] = df['profit_0']
+    df['raw_sum'] = (df['raw_profit'].cumsum(axis=0)).fillna(method='ffill')
+    dd_max_count = len(df.loc[df['margin_0'] < 0])
+    if shrink_to > 0:
+        df_max = df.loc[df['strike_0'].notnull()].sort_values('opt_trade_price')
+        min_trade_price_limit = df_max[-int(max_trades*shrink_to/100):]['opt_trade_price'].min()
+
+    if min_trade_price_limit > 0:
+        condition = min_trade_price_limit
+        df['cond'] = pd.Series(map(greater_than_condition, df['opt_trade_price'])).to_frame()
+        for i in range(count):
+            df['profit_%d' % i] = df['profit_%d' % i] * df['cond']
+        trades = len(df.loc[df['cond'] > 0])
+    else:
+        trades = max_trades
+    dd_count = len(df.loc[(df['margin_0'] < 0) & (df['cond'] == 1)])
+
     for i in range(count):
         df['opt_sum_%d' % i] = df['profit_%d' % i].cumsum(axis=0)
         df['opt_sum_%d' % i] = df['opt_sum_%d' % i].fillna(method='ffill')
     for i in range(count):
         df['opt_sum'] = df['opt_sum_%d' % i] if i == 0 else df['opt_sum'] + df['opt_sum_%d' % i]
-        df['spread_price'] = df['margin_%d' % i] if i == 0 else df['spread_price'] + df['margin_%d' % i]
-    if trade_stock in ('l','s'):
-        if trade_stock == 'l':
+        df['opt_trade_price'] = df['margin_%d' % i] if i == 0 else df['opt_trade_price'] + df['margin_%d' % i]
+    if stock in ('ltrade','strade'):
+        if stock == 'ltrade':
             df['under_profit'] = df['under_out_0'] - df['under_open_0']
         else:
             df['under_profit'] = df['under_open_0'] - df['under_out_0']
@@ -156,14 +153,14 @@ def backtest(types,sides,params,weeks):
         df['sum'] = df['opt_sum'] + df['under_sum']
     else:
         df['sum'] = df['opt_sum']
-
+    if stock in ('plot','strade','ltrade'):
+        df = scale_stock(df)
     return df
 
 
-def backtests():
-    global algo, before_date, start_date, fn,ticker,comm,min_price,max_price,min_spread_price_limit,trade_stock
+def main_proc():
+    global before_date, start_date, fn,ticker,comm,max_price,min_trade_price_limit,stock,shrink_to
     weeks = 1
-    draw_or_show = 'show'
     types = read_entry('backtest','types').split(',')
     sides = read_entry('backtest','sides').split(',')
     start_date = read_entry('backtest','start_date')
@@ -172,31 +169,22 @@ def backtests():
     disc_prc = flt(read_entry('backtest','disc_prc'))
     hedge_usd = int(read_entry('backtest','hedge_usd'))
     comm = flt(read_entry('backtest','comm'))
-    min_price = flt(read_entry('backtest','min_price'))
-    min_spread_price_limit = flt(read_entry('backtest','min_spread_price_limit'))
-    max_price = flt(read_entry('backtest','max_price'))
-    trade_stock = read_entry('backtest','trade_stock')
+    min_trade_price_limit = flt(read_entry('backtest','min_trade_price_limit'))
+    max_trade_price_limit = flt(read_entry('backtest','max_trade_price_limit'))
+    stock = read_entry('backtest','stock')
+    shrink_to = flt(read_entry('backtest','shrink_to_prc'))
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
-    save_test(df)
-    profit_lines_in_plot = int(df.shape[1] / single_option_col_count)
-    trades = len(df)
     summa = df['opt_sum'].iloc[-1] if trades > 0 else exit('No trades')
-    avg = df.loc[df['margin_0'] > 0]['margin_0'].mean()
-    mean_spread = df.loc[df['margin_0'] > 0]['spread_price'].mean()
-    max_dd = df.loc[df['margin_0'] < 0]['margin_0'].min()
-    dd_count = len(df.loc[df['margin_0'] < 0])
+    avg = df.loc[(df['margin_0'] > 0) & (df['cond'] == 1)]['margin_0'].mean()
+    avg_spread = df.loc[df['margin_0'] > 0]['opt_trade_price'].mean()
+    max_dd = df.loc[(df['margin_0'] < 0) & (df['cond'] == 1)]['margin_0'].min() if dd_count > 0 else 0
+    max_dd_str = ' max_dd %.2f,' % max_dd if dd_count > 0 else ''
+    spread_str = ' spread ulim/mlim/avg %.2f/%.2f/%.2f' % (max_trade_price_limit,min_trade_price_limit,avg_spread) if count > 1 else ''
+    txt = '{}, {}, {}, {}, trades {}/{} dd {}/{}\nsum %.2f, avg %.2f, %s%s'\
+        .format(ticker, types, sides, [disc_prc,hedge_usd], trades,max_trades,dd_count,dd_max_count) % (summa,avg,max_dd_str,spread_str)
+    plot(df,'quote_date',txt,opt_count=count,fn=fn,stock=stock)
 
-    min_max_str = '' if min_price == 0 and max_price == 0 else 'min/max price %.2f/%.2f,' % (min_price,max_price)
-    txt = '{}, type {}, side {},param {},\ntrades/dd {}/{}, sum profit %.2f, avg %.2f,max_dd %.2f %s avg_spread/limit %.2f/%.2f'\
-        .format(ticker, types, sides, [disc_prc,hedge_usd], trades,dd_count) % (summa,avg,max_dd,min_max_str,mean_spread,min_spread_price_limit)
-    if read_entry('backtest','plot_stock') == 'y':
-        df = add_stock_chart(df)
-
-    plot(df,'quote_date',txt,lines_count=profit_lines_in_plot,draw_or_show=draw_or_show,fn=fn,trade_stock=trade_stock)
-
-    if draw_or_show == 'draw':
-        input('pause >')
 
 
 if __name__ == '__main__':
-    backtests()
+    main_proc()

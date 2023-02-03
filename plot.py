@@ -31,33 +31,27 @@ def custom_plot_(df,a,b):
     plt.show()
     plt.pause(0.0001)
 
-def plot(df,x_axis,txt,lines_count,draw_or_show,fn,trade_stock):
+def plot(df,x_axis,txt,fn,opt_count,stock):
     cols = '%s,' % x_axis
-    if lines_count > 1:
-        for i in range(lines_count):
+    if opt_count > 1:
+        for i in range(opt_count):
             cols = cols + 'opt_sum_%d,' % i
         cols = cols + 'opt_sum'
     else:
         cols = cols + 'opt_sum'
-    if 'Close' in df.columns:
+    cols = cols + ',raw_sum'
+    if stock in ('plot','ltrade','strade'):
         cols = cols + ',Close'
-    if 'under_sum' in df.columns and trade_stock in ('l','s'):
+    if 'under_sum' in df.columns and stock in ('ltrade','strade'):
         cols = cols + ',under_sum'
         cols = cols + ',sum'
     dfp = df[cols.split(',')]
     dfp = dfp.set_index(x_axis)
     ax = dfp.plot(figsize=(11, 7), title=txt)
     xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')
-    ax.set_xticks(xtick, minor=False)
+    ax.set_xticks(xtick, minor=False)   # play with parameter
     ax.grid('on', which='minor')
     ax.grid('on', which='major')
     # # ax.set_ylim(ylim_bottom, ylim_top)
     plt.savefig('../out/%s-p.png' % fn)
-
-    if draw_or_show == 'draw':
-        plt.draw()
-    else:
-        plt.show()
-    plt.pause(0.0001)
-    if draw_or_show == 'draw':
-        plt.close()
+    plt.show()

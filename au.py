@@ -13,7 +13,7 @@ def read_opt_file(ofn):
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     return df
-def normalize(df):
+def scale_stock(df):
     stock = 'Close'
     if 'opt_sum_1' in df.columns:
         cols = ['opt_sum_0', 'opt_sum_1', 'opt_sum']
