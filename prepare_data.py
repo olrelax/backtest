@@ -221,6 +221,7 @@ def repair(ticker,opt_type):
     df = df.sort_values(['quote_date','expiration','strike'])
     df.to_csv(fn,index=False)
 
+
 def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
     if ch == 'y':
         download_yahoo('2007-01-01',arg_1)
@@ -235,7 +236,7 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
         weeks = 1   #
 
         w = fun(ticker=arg_1,y=start_year,opt_type=opt_type,wks=weeks)
-        for i in range(2022 - start_year):
+        for i in range(2023 - start_year):
             w = pd.concat([w,fun(ticker=arg_1,y=1+start_year+i,opt_type=opt_type,wks=weeks)],ignore_index=True)
         w = join_stock(w,ticker)
         fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,opt_type,weeks)

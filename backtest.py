@@ -11,11 +11,11 @@ before_date = ''
 fn = ''
 comm = 0
 max_price = 0
-min_trade_price_limit = 0
+low_price_limit = 0
 condition = 0
 
 stock = ''
-dd_count,dd_max_count,max_trades,trades = 0, 0, 0, 0
+dd_count,dd_raw_count,max_trades,trades = 0, 0, 0, 0
 shrink_to = 0
 def show(df, stop=True):
     name = get_name(df)[0]
@@ -109,7 +109,7 @@ def in2exp(params, weeks,side, opt_type,i):
     df = numerate(df,i)
     return df
 def backtest(types,sides,params,weeks):
-    global count, min_trade_price_limit,max_trades,trades,condition,dd_max_count,dd_count
+    global count, low_price_limit,max_trades,trades,condition,dd_raw_count,dd_count
     count = min(len(sides), len(params),len(types))
     df = None
     for i in range(count):
@@ -118,18 +118,17 @@ def backtest(types,sides,params,weeks):
         df = df_side if i == 0 else pd.merge(df, df_side, on=['quote_date', 'expiration'], how='inner')
     max_trades = len(df)
     df = add_stock_chart(df)
-    if count > 1:
-        for i in range(count):
-            df['opt_trade_price'] = df['open_0'] if i == 0 else df['opt_trade_price'] - df['open_%d' % i]
+    for i in range(count):
+        df['opt_trade_price'] = df['open_0'] if i == 0 else df['opt_trade_price'] - df['open_%d' % i]
     df['raw_profit'] = df['profit_0']
     df['raw_sum'] = (df['raw_profit'].cumsum(axis=0)).fillna(method='ffill')
-    dd_max_count = len(df.loc[df['margin_0'] < 0])
+    dd_raw_count = len(df.loc[df['margin_0'] < 0])
     if shrink_to > 0:
         df_max = df.loc[df['strike_0'].notnull()].sort_values('opt_trade_price')
-        min_trade_price_limit = df_max[-int(max_trades*shrink_to/100):]['opt_trade_price'].min()
+        low_price_limit = df_max[-int(max_trades*shrink_to/100):]['opt_trade_price'].min()
 
-    if min_trade_price_limit > 0:
-        condition = min_trade_price_limit
+    if low_price_limit > 0:
+        condition = low_price_limit
         df['cond'] = pd.Series(map(greater_than_condition, df['opt_trade_price'])).to_frame()
         for i in range(count):
             df['profit_%d' % i] = df['profit_%d' % i] * df['cond']
@@ -159,7 +158,7 @@ def backtest(types,sides,params,weeks):
 
 
 def main_proc():
-    global before_date, start_date, fn,ticker,comm,max_price,min_trade_price_limit,stock,shrink_to
+    global before_date, start_date, fn,ticker,comm,max_price,low_price_limit,stock,shrink_to
     weeks = 1
     types = read_entry('backtest','types').split(',')
     sides = read_entry('backtest','sides').split(',')
@@ -169,19 +168,21 @@ def main_proc():
     disc_prc = flt(read_entry('backtest','disc_prc'))
     hedge_usd = int(read_entry('backtest','hedge_usd'))
     comm = flt(read_entry('backtest','comm'))
-    min_trade_price_limit = flt(read_entry('backtest','min_trade_price_limit'))
-    max_trade_price_limit = flt(read_entry('backtest','max_trade_price_limit'))
+    low_price_limit = flt(read_entry('backtest','low_price_limit'))
+    high_price_limit = flt(read_entry('backtest','high_price_limit'))
     stock = read_entry('backtest','stock')
     shrink_to = flt(read_entry('backtest','shrink_to_prc'))
     df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
+    save_test(df)
     summa = df['opt_sum'].iloc[-1] if trades > 0 else exit('No trades')
-    avg = df.loc[(df['margin_0'] > 0) & (df['cond'] == 1)]['margin_0'].mean()
-    avg_spread = df.loc[df['margin_0'] > 0]['opt_trade_price'].mean()
-    max_dd = df.loc[(df['margin_0'] < 0) & (df['cond'] == 1)]['margin_0'].min() if dd_count > 0 else 0
-    max_dd_str = ' max_dd %.2f,' % max_dd if dd_count > 0 else ''
-    spread_str = ' spread ulim/mlim/avg %.2f/%.2f/%.2f' % (max_trade_price_limit,min_trade_price_limit,avg_spread) if count > 1 else ''
-    txt = '{}, {}, {}, {}, trades {}/{} dd {}/{}\nsum %.2f, avg %.2f, %s%s'\
-        .format(ticker, types, sides, [disc_prc,hedge_usd], trades,max_trades,dd_count,dd_max_count) % (summa,avg,max_dd_str,spread_str)
+    descr_str = '{} {} {} disc {}, hedge {}'.format(ticker, types, sides, disc_prc,hedge_usd)
+    limit_str = 'h_lim, %.2f, l_lim %.2f' % (high_price_limit,low_price_limit) if high_price_limit > 0 and low_price_limit > 0 else 'l_lim %.2f' % low_price_limit if low_price_limit > 0 else 'h_lim %.2f' % high_price_limit if high_price_limit > 0 else ''
+    cond_str = 'shrink %d, %s' % (shrink_to, limit_str) if shrink_to > 0 else limit_str
+    max_dd_val = df.loc[(df['margin_0'] < 0) & (df['cond'] == 1)]['margin_0'].min() if dd_count > 0 else 0
+    max_raw_dd_val = df.loc[df['margin_0'] < 0]['margin_0'].min() if dd_raw_count > 0 else 0
+    dd_str = 'dd count %d/%d, val %.2f/%.2f' % (dd_count,dd_raw_count,-max_dd_val,-max_raw_dd_val) if dd_count > 0 or dd_raw_count > 0 else ''
+    res = 'sum %.2f, tr %d/%d, %s' % (summa, trades,max_trades,dd_str)
+    txt = '%s, %s\n%s' % (descr_str, cond_str,res)
     plot(df,'quote_date',txt,opt_count=count,fn=fn,stock=stock)
 
 
