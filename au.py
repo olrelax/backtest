@@ -4,6 +4,13 @@ import pandas as pd
 from os import path
 import time
 from configparser import ConfigParser, NoOptionError
+def isfloat(v):
+    try:
+        float(v)
+        result = True
+    except ValueError:
+        result = False
+    return result
 
 def days_from_to(d0,d1):
     delta = d1 - d0
@@ -14,7 +21,7 @@ def read_opt_file(ofn):
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     return df
 def scale_stock(df):
-    stock = 'Close'
+    stock = 'Open'
     if 'opt_sum_1' in df.columns:
         cols = ['opt_sum_0', 'opt_sum_1', 'opt_sum']
     else:
@@ -26,6 +33,7 @@ def scale_stock(df):
     df[stock] = df[stock] * (opt_max - opt_min) / (under_max - under_min)
     under_min = df[stock].to_numpy().min()
     df[stock] = df[stock] - under_min + opt_min
+    df = df.rename(columns={'Open':'stock'})
     return df
 
 
@@ -135,12 +143,14 @@ parser = None
 #    config_object.read('data/init/config.ini')
 
 
-def read_entry(section, entry_name):
+def read_entry(section, entry_name,check=None):
     global parser
     if parser is None:
         parser = ConfigParser()
         parser.read('config.ini')
     a = parser.get(section, entry_name)
+    if check is not None and len(a) > 0 and a not in check:
+        exit('Legal values for {} in {}'.format(entry_name,check))
     return a
 def flt(ch):
     return float(ch) if len(ch)>0 else 0.0

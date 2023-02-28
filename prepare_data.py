@@ -182,14 +182,20 @@ def loc_weekly_exp_cboe(ticker,y,t,exact=True):
     return dm
 
 
-def loc_mon_fri(ticker,y,opt_type,wks):
+def loc_mon_fri(ticker,y,opt_type,wks,mf):
     o = read_opt(ticker,y,opt_type)
     if o is None:
-        exit()
-    days_to_exp = 4+7*(wks-1)
+        exit("read_opt returned None")
     d = o[['quote_date','expiration','option_type','strike','underlying_bid_1545','underlying_ask_1545','open','high','low','close','bid_1545','ask_1545','underlying_bid_eod','underlying_ask_eod','bid_eod','ask_eod','weekday','exp_weekday','days_to_exp']].sort_values(['quote_date','expiration','strike','option_type'])
-    d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == days_to_exp) & (d['weekday'] == 1))]
-    print('%s %dw%d weeks done' % (opt_type,y,wks))
+    if mf == 'mf':
+        days_to_exp = 4 + 7 * (wks - 1)
+        d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 5)) | ((d['days_to_exp'] == days_to_exp) & (d['weekday'] == 1))]
+    elif mf == 'fm':
+        days_to_exp = 3 + 7 * (wks - 1)
+        d = d.loc[((d['days_to_exp'] == 0) & (d['weekday'] == 1)) | ((d['days_to_exp'] == days_to_exp) & (d['weekday'] == 5))]
+    else:
+        exit('wrong weekdays condition')
+    print('%s %s %dw%d weeks done' % (mf,opt_type,y,wks))
     return d
 
 def make_long_file(start_year):
@@ -208,8 +214,8 @@ def join_stock(df,ticker):
     opt = pd.read_csv(ofn,parse_dates=['quote_date']) if df is None else df
     df = pd.merge(opt,stock,on='quote_date').rename(columns={'Open':'underlying_open','High':'underlying_high','Low':'underlying_low','Close':'underlying_close'})
     return df
-def repair(ticker,opt_type):
-    fn = '../data/%s/%s_mon_fri_%s_1.csv' % (ticker,ticker,opt_type)
+def repair(ticker,opt_type,mf):
+    fn = '../data/%s/%s_%s_%s_1.csv' % (ticker,ticker,mf,opt_type)
     df = pd.read_csv(fn)
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
@@ -228,22 +234,25 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
     elif ch == 'r':
         process_cboe_source(ticker=arg_1,year=int(arg_2),option_type=arg_3)   # 'PC' for single file for both types, or 'P,C' for 2 separate files for each type
         add_weekday(ticker=arg_1,y=int(arg_2),option_type=arg_3)
-    elif ch == 'mf':
+    elif ch == 'mf' or ch == 'fm':
         ticker = arg_1
-        start_year = int(arg_2)
+        start_year = 2020  # int(arg_2)
         opt_type = arg_3
         fun = loc_mon_fri
         weeks = 1   #
 
-        w = fun(ticker=arg_1,y=start_year,opt_type=opt_type,wks=weeks)
+        w = fun(ticker=arg_1,y=start_year,opt_type=opt_type,wks=weeks,mf=ch)
         for i in range(2023 - start_year):
-            w = pd.concat([w,fun(ticker=arg_1,y=1+start_year+i,opt_type=opt_type,wks=weeks)],ignore_index=True)
+            w = pd.concat([w,fun(ticker=arg_1,y=1+start_year+i,opt_type=opt_type,wks=weeks,mf=ch)],ignore_index=True)
         w = join_stock(w,ticker)
-        fn = '../data/%s/%s_mon_fri_%s_%d.csv' % (ticker,ticker,opt_type,weeks)
+        fn = '../data/%s/%s_%s_%s_%d.csv' % (ticker,ticker,ch,opt_type,weeks)
         # noinspection PyTypeChecker
         w.to_csv(fn,index=False)
     elif ch == 'repair':
-        repair(ticker=arg_1,opt_type=arg_3)
+        repair(ticker=arg_1,opt_type=arg_3, mf='mf')
+        # repair(ticker=arg_1, opt_type=arg_3, mf='fm')
+
+
 def deb():
     d = '../data/SPY_2022_CBOE_SRC/'
     system('ls %s|tail -n 5' % d)

@@ -1,3 +1,4 @@
+import pandas as pd
 from dateutil.relativedelta import *
 import inspect
 from au import *
@@ -12,8 +13,8 @@ def get_name(var):
 
 def save(dtf,arg_name=None,stop=False):
     name = get_name(dtf)[0] if arg_name is None else arg_name
-    print('save',name)
-    dtf.to_csv('../devel/%s.csv' % name,index=True)
+    dtf.to_csv('../devel/%s.csv' % name,index=False)
+    print('save %s done' % name)
     if stop:
         exit()
 def show(df, stop=True, ):
@@ -76,13 +77,8 @@ def add_wrk_days3(dt):
 def add_wrk_days4(dt):
     global exp_in
     return add_work_days(dt,exp_in)
-def print_df(df):
-    None
-def lowest_week_price(tick,enter_weekday,show_rows,yr=None):
-    # df = pd.read_csv('../data/%s/%s-yahoo_wkd.csv' % (tick,tick))[['Date','Open','Low','Close','wkd']]
+def lowest_week_price(tick,enter_weekday,show_rows,arg,yr=None):
     df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick))[['Date','Open','Low','Close']]
-    # df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))
-
     df['Date'] = pd.to_datetime(df['Date'])
     df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
     df['Date1'] = pd.Series(map(add_wrk_days1,df['Date']))
@@ -115,24 +111,47 @@ def lowest_week_price(tick,enter_weekday,show_rows,yr=None):
         ed = s2d('%d-01-01' % (yr + 1))
         bd = s2d('%d-01-01'%yr)
         df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
-    df = df.sort_values('dd_exp_prc')[['Date','Open','Low1','Low2',	'Low3','Low4','Close4','dd0','dd1','dd2','dd3','dd4','dd_Low_max','dd_Low_prc','dd_exp_max','dd_exp_prc','dd_exp','Date1','Date2','Date3','Date4']]
+    df = df.sort_values('dd_%s_prc' % arg)[['Date','Open','Low1','Low2','Low3','Low4','Close4','dd0','dd1','dd2','dd3','dd4','dd_Low_max','dd_Low_prc','dd_exp_max','dd_exp_prc','dd_exp','Date1','Date2','Date3','Date4']]
 
-    df = df[-10:]
-#    df = df[['Date','dd_Low_prc','dd_exp_prc']]
+    df = df[-show_rows:]
     df['worst_day'] = ''
     df['worst_dd'] = 0.
-    #i_worst_day = df.columns.get_loc('worst_day')
-    #i_worst_dd = df.columns.get_loc('worst_dd')
     for r,s in df[['dd0','dd1','dd2','dd3','dd4']].iterrows():
-        dd_max = 0
-        i_max = ''
-        for i,dd in s.items():
-            if dd > dd_max:
-                i_max = i
-                dd_max = dd
-        df.at[r,'worst_day'] = i_max
-    print(df[['Date','dd_Low_prc','dd_exp_prc','worst_day']].tail(show_rows))
+        max_dd = 0
+        worst_wd = ''
+        for wd,dd in s.items():
+            if dd > max_dd:
+                worst_wd = wd
+                max_dd = dd
+        df.at[r,'worst_day'] = worst_wd
+    print(df[['Date','dd_Low_prc','dd_exp_prc','worst_day']])
     save(df)
+def print_df(df):
+    row = df.iloc[0]
+    columns = df.columns
+    s = ''
+    for c in range(len(row)):
+        v = row[c]
+        if isinstance(v, datetime):
+            add = '%10s ' % columns[c]
+        elif isinstance(v, float):
+            add = '%6s ' % columns[c]
+        else:
+            add = ''
+        s = s + add
+    print(s)
+    for index, row in df.iterrows():
+        s = ''
+        for c in row:
+            if isinstance(c, datetime):
+                add = d2s(c)+' '
+            elif isinstance(c,float):
+                add = '%6.2f ' % c
+            else:
+                add = ''
+            s = s+add
+        print(s)
+        # print('%s %6.2f %s' % (d2s(row.iloc[1]),row.iloc[2],d2s(row.iloc[3])))
 
 def max_move(tick,enter_weekday,show_rows,yr=None,sort='Low'):
     df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
@@ -156,31 +175,136 @@ def max_move(tick,enter_weekday,show_rows,yr=None,sort='Low'):
     df1['wkd_x'] = pd.Series(map(str,df1['wkd_x']))
     df1['wkd_y'] = pd.Series(map(str,df1['wkd_y']))
     df1['wkd'] = df1['wkd_x'] + df1['wkd_y']
-    df1['prc_low'] = 100*(df1['delta_low'])/df1['Open']
-    df1['prc_high'] = 100*(df1['delta_high'])/df1['Open']
-    df1['prc_close'] = 100*(df1['delta_close'])/df1['Open']
-    df1['prc_c_c'] = 100*(df1['delta_c_c'])/df1['Close_x']
-
-    df_down = df1[['Date_x','Open','Date_y','Low','Close_y','prc_low','prc_close']]
-    df_up = df1[['Date_x','Open','Date_y','High','Close_y','prc_high','prc_close']]
+    df1['prc_l'] = 100*(df1['delta_low'])/df1['Open']
+    df1['prc_h'] = 100*(df1['delta_high'])/df1['Open']
+    df1['prc_c'] = 100*(df1['delta_close'])/df1['Open']
+    df1['prc_cc'] = 100*(df1['delta_c_c'])/df1['Close_x']
+    df1 = df1.rename(columns={'Date_x':'dt_in','Open':'enter','Date_y':'dt_out','Close_y':'out_c'})
+    df_down = df1[['dt_in','enter','dt_out','Low','out_c','prc_l','prc_c','prc_cc']]
     pd.set_option('display.precision', 2)
-    down = df_down.sort_values(sort)[-show_rows:]
-    up = df_up.sort_values(sort)[:show_rows]
-    print('------------UP---------------')
-    print(up)
-    print('------------DOWN---------------')
-    print(down)
+    down = (df_down.sort_values(sort)[-show_rows:]).reset_index()
 
+    # up = df_up.sort_values(sort)[:show_rows]
+    #print('------------UP---------------')
+    #print(up)
+    print('------------DOWN---------------')
+    print_df(down)
+def scale_stock(df):
+    stock = 'underlying'
+    cols = ['atm']
+    opt_min = df[cols].to_numpy().min()
+    opt_max = df[cols].to_numpy().max()
+    under_min = df[stock].to_numpy().min()
+    under_max = df[stock].to_numpy().max()
+    df[stock] = df[stock] * (opt_max - opt_min) / (under_max - under_min)
+    under_min = df[stock].to_numpy().min()
+    df[stock] = df[stock] - under_min + opt_min
+
+    otm_min = df['otm'].to_numpy().min()
+    otm_max = df['otm'].to_numpy().max()
+    df['otm'] = df['otm'] * (opt_max - opt_min) / (otm_max - otm_min)
+    otm_min = df['otm'].to_numpy().min()
+    df['otm'] = df['otm'] - otm_min + opt_min
+
+    return df
+
+def atm_price():
+    code_part = 4
+    timing = 'open'
+    disc = 8
+    plot = ['atm','otm']
+    if timing == '1545':
+        openf = 'ask_1545'
+    else:
+        openf = 'open'
+    bd = s2d('2021-01-01')
+    columns = ['quote_date', 'expiration', 'strike', 'open', 'ask_1545', 'underlying_bid_1545', 'days_to_exp']
+    if code_part in [0,1]:
+        df0 = pd.read_csv('../data/QQQ/QQQ_CBOE_2020_PC.csv')
+        df0 = df0.loc[(df0['option_type'] == 'P') & (df0['exp_weekday'] == 5) & (df0['days_to_exp'] <= 4)][columns]
+        df1 = pd.read_csv('../data/QQQ/QQQ_CBOE_2021_PC.csv')
+        df1 = df1.loc[(df1['option_type'] == 'P') & (df1['exp_weekday'] == 5) & (df1['days_to_exp'] <= 4)][columns]
+        df_20_21 = pd.concat([df0,df1])
+        df0 = pd.read_csv('../data/QQQ/QQQ_CBOE_2022_PC.csv')
+        df0 = df0.loc[(df0['option_type'] == 'P') & (df0['exp_weekday'] == 5) & (df0['days_to_exp'] <= 4)][columns]
+        df1 = pd.read_csv('../data/QQQ/QQQ_CBOE_2023_PC.csv')
+        df1 = df1.loc[(df1['option_type'] == 'P') & (df1['exp_weekday'] == 5) & (df1['days_to_exp'] <= 4)][columns]
+        df_22_23 = pd.concat([df0,df1])
+        df = pd.concat([df_20_21,df_22_23])
+        # save(df,'df1')
+    # elif code_part == 2:
+        # df = pd.read_csv('../devel/df1.csv')
+        df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+        df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
+        df = df.loc[df['days_to_exp'] == 4].drop(columns=['days_to_exp'])
+        if timing == 'open':
+            df_under = pd.read_csv('../data/QQQ/QQQ-yahoo.csv')
+            df_under['Date'] = pd.to_datetime(df_under['Date'])
+            df = pd.merge(df,df_under,left_on='quote_date',right_on='Date',how='outer')
+            df = df.rename(columns={'Open':'underlying','open':'enter'})
+            df = df.drop(columns={'underlying_bid_1545','ask_1545','Date','High','Low','Close','Adj Close','Volume'})
+        else:
+            df = df.rename(columns={'underlying_bid_1545':'underlying','ask_1545':'enter'})
+            df = df.drop(columns={'open'})
+        df['delta_atm'] = (df['underlying'] - df['strike']) * 100
+        df['delta_otm'] = (df['underlying'] * (100 - disc)/100 - df['strike']) * 100
+
+        df_atm = df.loc[df['delta_atm'] >= 0].copy()
+        df_atm['delta_atm'] = df_atm['delta_atm'].astype(int)
+        df_min = df_atm.groupby(['quote_date','expiration'])['delta_atm'].min().to_frame()
+        df_atm = pd.merge(df_atm,df_min,on=['quote_date','expiration','delta_atm']).drop_duplicates(subset=['quote_date'])
+        df_atm['enter'] = df_atm['enter'] - (df_atm['underlying'] - df_atm['strike'])
+        df_atm = df_atm[['expiration','enter','underlying']]
+
+        save(df_atm)
+        df_otm = df.loc[df['delta_otm'] >= 0].copy()
+        df_otm['delta_otm'] = df_otm['delta_otm'].astype(int)
+        df_min = df_otm.groupby(['quote_date','expiration'])['delta_otm'].min().to_frame()
+        df_otm = pd.merge(df_otm,df_min,on=['quote_date','expiration','delta_otm']).drop_duplicates(subset=['quote_date'])
+        df_otm = df_otm[['expiration','enter']]
+        df = pd.merge(df_atm,df_otm,on='expiration').rename(columns={'enter_x':'atm','enter_y':'otm'})
+        save(df)
+    # elif code_part == 3:
+        #df = pd.read_csv('../devel/df2.csv')
+        """
+        df0 = df.loc[df['days_to_exp'] == 0].rename(columns={'enter':'atm0'}).drop(columns=['days_to_exp'])
+        df1 = df.loc[df['days_to_exp'] == 1].rename(columns={'enter':'atm1'})
+        df2 = df.loc[df['days_to_exp'] == 2].rename(columns={'enter':'atm2'})
+        df3 = df.loc[df['days_to_exp'] == 3].rename(columns={'enter':'atm3'})
+        df4 = df.loc[df['days_to_exp'] == 4].rename(columns={'enter':'atm4'})
+        df = pd.merge(df0,df1[['atm1','expiration']],on=['expiration'])
+        df = pd.merge(df,df2[['atm2','expiration']],on=['expiration'])
+        df = pd.merge(df,df3[['atm3','expiration']],on=['expiration'])
+        df = pd.merge(df,df4[['atm4','expiration']],on=['expiration'])
+        df = df[['expiration','atm0','atm1','atm2','atm3','atm4','underlying']]
+        save(df)
+        """
+    if code_part in [0,4]:
+        df = pd.read_csv('../devel/df.csv')
+        df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
+        df = df.loc[df['expiration']>bd][['expiration','atm','otm','underlying']]
+        df = scale_stock(df)
+        df = df.set_index('expiration')
+        df = df[plot]
+        ax = df.plot(figsize=(11, 7))
+        freq = 'M' if len(df) > 10 else 'D'
+        xtick = pd.date_range(start=df.index.min(), end=df.index.max(), freq=freq)
+        ax.set_xticks(xtick, minor=False)  # play with parameter
+        ax.grid('on', which='minor')
+        ax.grid('on', which='major')
+        plt.savefig('../devel/%s.png' % openf)
+        plt.show()
 
 
 if __name__ == '__main__':
-    t = read_entry('research','ticker')
+    ticker = read_entry('research','ticker')
     ent_weekday = int(read_entry('research','enter_weekday'))
     exp_in = int(read_entry('research','expires_in'))
     show_r = int(read_entry('research','show_rows'))
     year = read_entry('research','year')
-#    day_timing = ['Open','Close']
-    arg_sort = 'prc_close'
-    max_move(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)
-    # lowest_week_price(tick=t,enter_weekday=ent_weekday,show_rows=show_r,yr=year)
+    arg = read_entry('research','arg')
+    arg_sort = 'prc_c'
+    atm_price()
+    # max_move(tick=ticker,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)
+    # lowest_week_price(tick=ticker,enter_weekday=ent_weekday,show_rows=show_r,arg=arg,yr=year)
     # single_opt(opt_date='2020-03-20',strike=177)

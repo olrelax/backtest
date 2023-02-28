@@ -31,7 +31,7 @@ def custom_plot_(df,a,b):
     plt.show()
     plt.pause(0.0001)
 
-def plot(df,x_axis,txt,fn,opt_count,stock):
+def plot(df,x_axis,txt,fn,opt_count,stock,plot_raw):
     cols = '%s,' % x_axis
     if opt_count > 1:
         for i in range(opt_count):
@@ -39,19 +39,20 @@ def plot(df,x_axis,txt,fn,opt_count,stock):
         cols = cols + 'opt_sum'
     else:
         cols = cols + 'opt_sum'
-    cols = cols + ',raw_sum'
+    if plot_raw == 'y':
+        cols = cols + ',raw_sum'
     if stock in ('plot','ltrade','strade'):
-        cols = cols + ',Close'
+        cols = cols + ',stock'
     if 'under_sum' in df.columns and stock in ('ltrade','strade'):
         cols = cols + ',under_sum'
         cols = cols + ',sum'
     dfp = df[cols.split(',')]
     dfp = dfp.set_index(x_axis)
     ax = dfp.plot(figsize=(11, 7), title=txt)
-    xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq='M')
+    freq = 'M' if len(dfp) > 10 else 'D'
+    xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq=freq)
     ax.set_xticks(xtick, minor=False)   # play with parameter
     ax.grid('on', which='minor')
     ax.grid('on', which='major')
-    # # ax.set_ylim(ylim_bottom, ylim_top)
     plt.savefig('../out/%s-p.png' % fn)
     plt.show()
