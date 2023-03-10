@@ -77,7 +77,7 @@ def add_wrk_days3(dt):
 def add_wrk_days4(dt):
     global exp_in
     return add_work_days(dt,exp_in)
-def lowest_week_price(tick,enter_weekday,show_rows,arg,yr=None):
+def lowest_week_price(tick,enter_weekday,show_rows,sort,yr=None):
     df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick))[['Date','Open','Low','Close']]
     df['Date'] = pd.to_datetime(df['Date'])
     df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
@@ -106,12 +106,17 @@ def lowest_week_price(tick,enter_weekday,show_rows,arg,yr=None):
     df['dd_Low_prc'] = (df['dd_Low_max']/df.Open) * 100
     df['dd_exp_max'] = df.Open.sub(df.Close4)
     df['dd_exp_prc'] = (df['dd_exp_max']/df.Open) * 100
-    if not yr == '':
+    if yr[:1] == '>':
+        yr = int(yr[1:])
+        bd = s2d('%d-01-01' % yr)
+        df = df.loc[df['Date'] > bd]
+    else:
         yr = int(yr)
         ed = s2d('%d-01-01' % (yr + 1))
-        bd = s2d('%d-01-01'%yr)
+        bd = s2d('%d-01-01' % yr)
         df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
-    df = df.sort_values('dd_%s_prc' % arg)[['Date','Open','Low1','Low2','Low3','Low4','Close4','dd0','dd1','dd2','dd3','dd4','dd_Low_max','dd_Low_prc','dd_exp_max','dd_exp_prc','dd_exp','Date1','Date2','Date3','Date4']]
+
+    df = df.sort_values('dd_%s_prc' % sort)[['Date','Open','Low1','Low2','Low3','Low4','Close4','dd0','dd1','dd2','dd3','dd4','dd_Low_max','dd_Low_prc','dd_exp_max','dd_exp_prc','dd_exp','Date1','Date2','Date3','Date4']]
 
     df = df[-show_rows:]
     df['worst_day'] = ''
@@ -153,15 +158,24 @@ def print_df(df):
         print(s)
         # print('%s %6.2f %s' % (d2s(row.iloc[1]),row.iloc[2],d2s(row.iloc[3])))
 
-def max_move(tick,enter_weekday,show_rows,yr=None,sort='Low'):
-    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (tick,tick),parse_dates=['Date'])
+def max_move(tick,enter_weekday,show_rows,yr=None,sort='prc_c'):
+    if path.exists('../data/%s' % ticker):
+        folder = ticker
+    else:
+        folder = 'other'
+    df = pd.read_csv('../data/%s/%s-yahoo.csv' % (folder,tick),parse_dates=['Date'])
     df['wkd'] = pd.Series(map(lambda x: x.isoweekday(), df['Date']))     # isoweekday returns 1 for monday
     df['exp_Date'] = pd.Series(map(lambda x: add_wrk_days(x),df['Date']))
     if not yr == '':
-        yr = int(yr)
-        ed = s2d('%d-01-01' % (yr + 1))
-        bd = s2d('%d-01-01'%yr)
-        df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
+        if yr[:1] == '>':
+            yr = int(yr[1:])
+            bd = s2d('%d-01-01'%yr)
+            df = df.loc[df['Date'] > bd]
+        else:
+            yr = int(yr)
+            ed = s2d('%d-01-01' % (yr + 1))
+            bd = s2d('%d-01-01'%yr)
+            df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
 
     df_in = df[['Date','Open','Close','wkd','exp_Date']]
     df_exit = df[['Date','High','Low','Close','wkd']]
@@ -207,6 +221,27 @@ def scale_stock(df):
     df['otm'] = df['otm'] - otm_min + opt_min
 
     return df
+
+def from_1545_to_eod():
+    disc_usd = 2
+    max_price = 0.01
+    df = pd.read_csv('../data/SPY/SPY_CBOE_2020_P.csv',parse_dates=['quote_date'])
+    df = df.loc[df['days_to_exp'] == 0]
+    df['delta'] = (df['underlying_bid_1545'] - disc_usd - df['strike']) * 100
+    df['delta'] = df['delta'].astype(int)
+    df = df.loc[df['delta'] > 0]
+    df_min_delta = df.groupby(['quote_date'])['delta'].min().to_frame()
+    df = pd.merge(df_min_delta, df, on=['quote_date', 'delta']).sort_values(['quote_date', 'expiration'])
+    df = df.drop_duplicates(subset=['quote_date', 'expiration'])
+    df['dd'] = (df['underlying_bid_1545'] - df['underlying_bid_eod'])
+    df = df.loc[df['ask_1545'] <= max_price]
+    df['long_profit'] = df['bid_eod'] - df['ask_1545']
+    df = df.sort_values(['dd'])
+    df = df[['quote_date','strike','underlying_bid_1545','ask_1545','underlying_bid_eod','bid_eod','dd','long_profit']]
+    # save(df)
+    print(df[['quote_date','ask_1545','bid_eod','dd','long_profit']].tail(10))
+    print(df['long_profit'].sum())
+
 
 def atm_price():
     code_part = 4
@@ -294,17 +329,39 @@ def atm_price():
         ax.grid('on', which='major')
         plt.savefig('../devel/%s.png' % openf)
         plt.show()
-
-
+def an15m():
+    df = pd.read_csv('../data/QQQ/US1.QQQ_190101_230303.csv',names=['date','per','open','high','low','close','vol'],
+                     parse_dates=['date'],dtype={'per':object})
+    df['dd'] = df.open - df.close
+    df['weekday'] = pd.Series(map(lambda x: x.isoweekday(), df['date']))
+    bd = s2d('2021-12-31')
+    df = df.loc[df['date']>bd]
+    df = (df.loc[df.per == '154500']).sort_values(['dd'])
+    df = df.loc[(df['weekday']>1) & (df['weekday']<5)]
+    print(df.tail(20))
+"""
+09/22/2022
+"""
 if __name__ == '__main__':
     ticker = read_entry('research','ticker')
     ent_weekday = int(read_entry('research','enter_weekday'))
     exp_in = int(read_entry('research','expires_in'))
     show_r = int(read_entry('research','show_rows'))
     year = read_entry('research','year')
-    arg = read_entry('research','arg')
-    arg_sort = 'prc_c'
-    atm_price()
-    # max_move(tick=ticker,enter_weekday=ent_weekday,show_rows=show_r,yr=year,sort=arg_sort)
-    # lowest_week_price(tick=ticker,enter_weekday=ent_weekday,show_rows=show_r,arg=arg,yr=year)
-    # single_opt(opt_date='2020-03-20',strike=177)
+    procedure = read_entry('research','procedure')
+    arg_1 = read_entry('research','arg_1')
+    arg_2 = read_entry('research','arg_2')
+    arg_3 = read_entry('research','arg_2')
+
+    if procedure == '1':
+        max_move(tick=ticker, enter_weekday=ent_weekday, show_rows=show_r, yr=year, sort=arg_1)
+    elif procedure == '2':
+        lowest_week_price(tick=ticker,enter_weekday=ent_weekday,show_rows=show_r,sort=arg_1,yr=year)
+    elif procedure == '3':
+        atm_price()
+    elif procedure == '4':
+        single_opt(opt_date='2020-03-20',strike=177)
+    elif procedure == '5':
+        from_1545_to_eod()
+    elif procedure == '6':
+        an15m()

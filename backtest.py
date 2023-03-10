@@ -15,10 +15,10 @@ condition = 0   # global variable used for map methods
 stock = ''
 mf = 'mf'
 capital = 0
-disc_prc,hedge_usd = 0,0
 dd_count,dd_raw_count,max_trades,trades = 0, 0, 0, 0
 shrink_by_lower_cond,shrink_by_high_cond = 0,0
 enter_time = ''
+hedge_usd,disc_prc = 0,0
 def show(df, stop=True):
     name = get_name(df)[0]
     print('-----------------%s------------' % name)
@@ -46,7 +46,7 @@ def get_name(var):
     return [var_name for var_name, var_val in callers_local_vars if var_val is var]
 
 def numerate(df,i):
-    return df.rename(columns={'strike': 'strike_%d' % i, 'overstrike':'overstrike_%d' % i,'underlying_enter': 'under_enter_%d' % i,'under_out': 'under_out_%d' % i,
+    return df.rename(columns={'strike': 'strike_%d' % i, 'overstrike':'overstrike_%d' % i,'under_enter': 'under_enter_%d' % i,'under_out': 'under_out_%d' % i,
                           'enter': 'enter_%d' % i,'out': 'out_%d' % i,
                           'margin': 'margin_%d' % i,'profit': 'profit_%d' % i})
 
@@ -64,15 +64,6 @@ def add_stock_chart(out_df):
     df = pd.merge(stock_df,out_df,on='quote_date',how='outer')
     return df
 
-def make_delta_column(df_in,opt_type,params,i):
-
-    k = (100 + params[0] * (1 if opt_type[0] == 'C' else -1)) / 100
-    hedge_shift = params[1] * i * (1 if opt_type[0] == 'C' else -1)
-    under_in = 'underlying_open' if enter_time == 'open' else 'underlying_bid_1545' if enter_time == '1545' else ''
-    df_in['delta'] = (df_in[under_in] * k + hedge_shift - df_in['strike']).abs() * 10.0
-    df_in['delta'] = df_in['delta'].astype(int)
-    return df_in
-
 def greater_than_condition(value):
     return 1. if value > condition else 0
 
@@ -84,14 +75,16 @@ def select_cols():
     body = 'strike_0,under_enter_0,enter_0,under_out_0,out_0,margin_0,profit_0,opt_sum_0,overstrike_0,'
     if count == 2:
         body = body + 'strike_1,under_enter_1,enter_1,under_out_1,out_1,margin_1,profit_1,opt_sum_1,overstrike_1,'
-    cols_str = head + body + 'opt_sum,sum,opt_trade_price,raw_profit,raw_sum,lcond,hcond,stock'
+    cols_str = head + body + 'opt_sum,sum,opt_trade_price,raw_profit,raw_sum,lcond,hcond'
     if stock in ('ltrade','strade'):
-        cols_str = cols_str +',under_sum'
+        cols_str = cols_str +',stock,under_sum'
+    if stock == 'plot':
+        cols_str = cols_str + ',stock'
     return cols_str.split(',')
 
 def scale_to_capital(df):
     if stock in ('strade', 'ltrade') and capital not in ('','per opt'):
-        exit('Unable scale to capital when trade stock')
+        return exit('Unable scale to capital when trade stock')
     if capital in ('','per opt'):
         return df
     elif capital in ('%','prc'):
@@ -104,7 +97,7 @@ def scale_to_capital(df):
         contracts_qty = float(capital)/contract_margin
         k = 100 * contracts_qty
     else:
-        exit('capital value must be in (\'\'|\'per opt\',\'%%\'|\'prc\', real number)')
+        return exit('capital value must be in (\'\'|\'per opt\',\'%%\'|\'prc\', real number)')
     for i in range(count):
         df['opt_sum_%d' % i] = df['opt_sum_%d' % i].mul(k)
     df['opt_sum'] = df['opt_sum'].mul(k)
@@ -112,27 +105,87 @@ def scale_to_capital(df):
     return df
 
 
+algo_names = ['', '']
+algo_values = [0, 0]
+def decode_algo(algo_str):
+    global algo_names,algo_values
+    algo = algo_str.split(',')
+    for i in range(count):
+        algo_i = algo[i].strip()
+        split = ' ' if ' ' in algo_i else '='
+        algo_names[i] = algo_i.split(split)[0].strip()
+        algo_values[i] = algo_i.split(split)[1].strip()
+        if algo_names[i] in ('op','otm_prc'):
+            algo_names[i] = 'otm_prc'
+        elif algo_names[i] in ('ou','otm_usd'):
+            algo_names[i] = 'otm_usd'
+        elif algo_names[i] in ('hu','hedge_usd'):
+            algo_names[i] = 'hedge_usd'
+        elif algo_names[i] in ('fp', 'fixed_price','fix_price'):
+            algo_names[i] = 'fixed_price'
+        else:
+            exit('Unknown algo_name <%s>' % algo_names[i])
 
-def in2exp(params, weeks,side, opt_type,i):
+k=0
+def make_delta_column(df_in,opt_type,i):
+    global hedge_usd,disc_prc,k
+    if i == 0:
+        hedge_usd = 35
+        if algo_names[i] == 'otm_prc':
+            prc = float(algo_values[i])
+            disc_prc = prc
+            k = (100. + prc * (1 if opt_type[0] == 'C' else -1.)) / 100.
+            if i == 0:
+                df_in['delta'] = (df_in['under_enter'] * k - df_in['strike']).abs() * 10.0
+                df_in['delta'] = df_in['delta'].astype(int)
+        elif algo_names[i] == 'fixed_price':
+            price = float(algo_values[i])
+            df_in['delta'] = ((df_in['enter'].sub(price)).abs()*100.0).astype(int)
+        else:
+            return exit('Wrong algo %d <%s>' % (i, algo_names[i]))
+    if i > 0:
+        if algo_names[i] == 'hedge_usd':
+            usd = int(algo_values[i])
+            hedge_shift = usd * i * (1 if opt_type[0] == 'C' else -1)
+            hedge_usd = abs(hedge_shift)
+            df_in['delta'] = (df_in['under_enter'] * k + hedge_shift - df_in['strike']).abs() * 10.0
+            df_in['delta'] = df_in['delta'].astype(int)
+        elif algo_names[i] == 'otm_prc':
+            hedge_usd = 0
+            prc = float(algo_values[i])
+            k = (100. + prc * (1 if opt_type[0] == 'C' else -1.)) / 100.
+            df_in['delta'] = (df_in['under_enter'] * k - df_in['strike']).abs() * 10.0
+            df_in['delta'] = df_in['delta'].astype(int)
+        else:
+            return exit('Wrong algo %d <%s>' % (i,algo_names[i]))
+    return df_in
+
+
+def in2exp(side, opt_type,i):
     global condition
 
     bd = datetime.strptime(start_date, '%Y-%m-%d')
     ed = datetime.strptime(before_date, '%Y-%m-%d') if len(before_date) > 0 else None
-    opts_fn = '../data/%s/%s_%s_PC_%d.csv' % (ticker,ticker,mf,weeks)
+    opts_fn = '../data/%s/%s_%s_PC_1.csv' % (ticker,ticker,mf)
     df = pd.read_csv(opts_fn)    # ,parse_dates=['quote_date','expiration'])
     df['quote_date'] = pd.to_datetime(df['quote_date'], format='%Y-%m-%d')
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
     df = df.loc[df['option_type'] == opt_type[0]]
-    df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,params=params,i=i)
-    df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
-    sfx = 'open' if enter_time == 'open' else 'bid_1545' if enter_time == '1545' else ''
-    df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration']).drop_duplicates(
-        subset=['quote_date', 'expiration'])[['quote_date', 'expiration', 'strike', 'underlying_%s' % sfx, sfx]]
-    df_in = df_in.rename(columns={sfx:'enter','underlying_%s' % sfx:'underlying_enter'})
     opt_prefix = 'ask' if side[:1] == 's' else 'bid' if side[:1] == 'l' else exit("Wrong side '%s'" % side)
+    sfx = 'open' if enter_time == 'open' else '%s_1545' % opt_prefix if enter_time == '1545' else ''
+    df = df.rename(columns={sfx:'enter','underlying_%s' % sfx:'under_enter'})
+    df = df.loc[((df['quote_date'] < df['expiration']) & (df['enter'] > 0.01)) | (df['quote_date'] == df['expiration'])]
     under_prefix = 'bid' if side[:1] == 's' else 'ask'
-    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'underlying_%s_eod' % under_prefix,'%s_eod' % opt_prefix]].rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'}).copy().reset_index(drop=True)
+    df = df.rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'})
+    df = df[['quote_date','expiration','under_enter','strike','enter','under_out','out_tmp','days_to_exp']]
+
+    df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,i=i)
+    df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
+    df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration'])
+    df_in = df_in.drop_duplicates(subset=['quote_date', 'expiration'])
+    df_in = df_in[['expiration', 'delta', 'quote_date', 'under_enter', 'strike', 'enter']]
+    df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'under_out','out_tmp']].copy().reset_index(drop=True)
     sign = 1. if opt_type[0] == 'P' else -1.
     df_out['overstrike'] = (df_out['strike'] - df_out['under_out']) * sign
     condition = 0
@@ -144,12 +197,13 @@ def in2exp(params, weeks,side, opt_type,i):
     df['profit'] = df['margin'].sub(comm)
     df = numerate(df,i)
     return df
-def backtest(types,sides,params,weeks):
+def backtest(types,sides,algo_str):
     global count, low_price_limit,high_price_limit,max_trades,trades,condition,dd_raw_count,dd_count
-    count = min(len(sides), len(params),len(types))
+    count = min(len(sides), len(types))
     df = None
+    decode_algo(algo_str)
     for i in range(count):
-        df_side = in2exp(params,weeks, sides[i],types[i], i)
+        df_side = in2exp(sides[i],types[i],i)
         df_side = df_side.sort_values(['quote_date', 'expiration'])
         df = df_side if i == 0 else pd.merge(df, df_side, on=['quote_date', 'expiration'], how='inner')
     max_trades = len(df)
@@ -211,15 +265,13 @@ def backtest(types,sides,params,weeks):
 def main_proc():
     global before_date, start_date, fn,ticker,comm,low_price_limit,high_price_limit,stock,\
         shrink_by_high_cond,shrink_by_lower_cond,mf,capital,disc_prc,hedge_usd,enter_time
-    weeks = 1
     types = read_entry('backtest','types').split(',')
     sides = read_entry('backtest','sides').split(',')
+    algo_str = read_entry('backtest','sides_algo')
     start_date = read_entry('backtest','start_date')
     before_date = read_entry('backtest','before_date')
     enter_time = read_entry('backtest','enter_time')
     ticker = read_entry('backtest','ticker')
-    disc_prc = flt(read_entry('backtest','disc_prc'))
-    hedge_usd = int(read_entry('backtest','hedge_usd'))
     comm = flt(read_entry('backtest','comm'))
     low_price_limit = flt(read_entry('backtest','low_price_limit'))
     high_price_limit = flt(read_entry('backtest','high_price_limit'))
@@ -229,7 +281,9 @@ def main_proc():
     capital = read_entry('backtest','capital')
     shrink_by_high_cond = flt(read_entry('backtest','shrink_by_high_cond'))
     shrink_by_lower_cond = flt(read_entry('backtest','shrink_by_lower_cond'))
-    df = backtest(types,sides, [disc_prc,hedge_usd],weeks)
+
+    df = backtest(types,sides,algo_str)
+
     save_test(df)
     summa = df['opt_sum'].iloc[-1] if trades > 0 else exit('No trades')
     descr_str = '{} {} {} disc {}, hedge {}'.format(ticker, types, sides, disc_prc,hedge_usd)
@@ -238,9 +292,9 @@ def main_proc():
     max_dd_val = df.loc[(df['margin_0'] < 0) & (df['lcond'] == 1)]['margin_0'].min() if dd_count > 0 else 0
     max_raw_dd_val = df.loc[df['margin_0'] < 0]['margin_0'].min() if dd_raw_count > 0 else 0
     dd_str = 'dd count %d/%d, val %.2f/%.2f' % (dd_count,dd_raw_count,-max_dd_val,-max_raw_dd_val) if dd_count > 0 or dd_raw_count > 0 else ''
-    # sum_fmt = 'profit/capital $%.2f/$%.2f' % (summa,capital) if capital > 0 else 'profit %.2f%%' % summa if capital == 'prc' else 'profit %.2f' % summa
-    sum_fmt = 'profit/opt %.2f' % summa if capital in ('','per opt') else 'profit %.2f%%' % summa if capital in ('%','prc') else 'profit/capital $%.2f/$%.2f' % (summa,float(capital))
-    res = '%s, trades %d/%d, %s' % (sum_fmt, trades,max_trades,dd_str)
+    sum_fmt = 'profit %.2f' % summa if capital in ('','per opt') else 'profit %.2f%%' % summa if capital in ('%','prc') else 'profit/capital $%.2f/$%.2f' % (summa,float(capital))
+    per_trade = summa/trades
+    res = '%s, per trade %.2f, trades %d/%d, %s' % (sum_fmt, per_trade,trades,max_trades,dd_str)
     txt = '%s, %s\n%s' % (descr_str, cond_str,res)
     if mf == 'fm':
         txt = 'Fri - Mon\n%s' % txt

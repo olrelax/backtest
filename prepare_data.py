@@ -1,5 +1,5 @@
 import pandas as pd
-from os import walk
+from os import walk,path
 from dateutil.relativedelta import *
 from datetime import datetime
 from au import read_opt,read_entry
@@ -54,7 +54,10 @@ def download_yahoo(bd,ticker):
     ed = datetime.today().strftime('%Y-%m-%d')
     b = time.mktime(datetime.strptime(bd, '%Y-%m-%d').timetuple())
     e = time.mktime(datetime.strptime(ed, '%Y-%m-%d').timetuple())
-    fn = '../data/%s/%s-yahoo.csv' % (ticker,ticker)
+    if path.exists('../data/%s' % ticker):
+        fn = '../data/%s/%s-yahoo.csv' % (ticker,ticker)
+    else:
+        fn = '../data/other/%s-yahoo.csv' % ticker
     url = 'https://query1.finance.yahoo.com/v7/finance/download/%s?period1=%d&period2=%d&interval=1d&events=history&includeAdjustedClose=true' % (ticker,b,e)
     print(url)
     try:
@@ -236,7 +239,7 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
         add_weekday(ticker=arg_1,y=int(arg_2),option_type=arg_3)
     elif ch == 'mf' or ch == 'fm':
         ticker = arg_1
-        start_year = 2020  # int(arg_2)
+        start_year = int(arg_2)
         opt_type = arg_3
         fun = loc_mon_fri
         weeks = 1   #
