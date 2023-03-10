@@ -301,6 +301,5 @@ def main_proc():
     plot(df,'quote_date',txt,opt_count=count,fn=fn,stock=stock,plot_raw=plot_raw_result)
 
 
-
 if __name__ == '__main__':
     main_proc()

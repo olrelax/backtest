@@ -117,7 +117,6 @@ def lowest_week_price(tick,enter_weekday,show_rows,sort,yr=None):
         df = df.loc[(df['Date'] > bd) & (df['Date'] < ed)]
 
     df = df.sort_values('dd_%s_prc' % sort)[['Date','Open','Low1','Low2','Low3','Low4','Close4','dd0','dd1','dd2','dd3','dd4','dd_Low_max','dd_Low_prc','dd_exp_max','dd_exp_prc','dd_exp','Date1','Date2','Date3','Date4']]
-
     df = df[-show_rows:]
     df['worst_day'] = ''
     df['worst_dd'] = 0.

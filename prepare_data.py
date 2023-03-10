@@ -243,7 +243,6 @@ def process_data(ch,arg_1=None,arg_2=None,arg_3=None):
         opt_type = arg_3
         fun = loc_mon_fri
         weeks = 1   #
-
         w = fun(ticker=arg_1,y=start_year,opt_type=opt_type,wks=weeks,mf=ch)
         for i in range(2023 - start_year):
             w = pd.concat([w,fun(ticker=arg_1,y=1+start_year+i,opt_type=opt_type,wks=weeks,mf=ch)],ignore_index=True)
