@@ -172,14 +172,29 @@ def in2exp(side, opt_type,i):
     df['expiration'] = pd.to_datetime(df['expiration'], format='%Y-%m-%d')
     df = df.loc[(df['quote_date'] > bd) & (df['quote_date'] < ed)] if ed is not None else df.loc[df['quote_date'] > bd]
     df = df.loc[df['option_type'] == opt_type[0]]
-    opt_prefix = 'ask' if side[:1] == 's' else 'bid' if side[:1] == 'l' else exit("Wrong side '%s'" % side)
-    sfx = 'open' if enter_time == 'open' else '%s_1545' % opt_prefix if enter_time == '1545' else ''
-    df = df.rename(columns={sfx:'enter','underlying_%s' % sfx:'under_enter'})
-    df = df.loc[((df['quote_date'] < df['expiration']) & (df['enter'] > 0.01)) | (df['quote_date'] == df['expiration'])]
-    under_prefix = 'bid' if side[:1] == 's' else 'ask'
-    df = df.rename(columns={'%s_eod' % opt_prefix:'out_tmp','underlying_%s_eod' % under_prefix:'under_out'})
-    df = df[['quote_date','expiration','under_enter','strike','enter','under_out','out_tmp','days_to_exp']]
+    if enter_time == 'open':
+        enter_price = 'open'
+        under_enter_price = 'underlying_open'
+    elif enter_time == '1545':
+        enter_price = 'bid_1545'
+        if side[:1] == 's':
+            if opt_type == 'P':
+                under_enter_price = 'underlying_bid_1545'
+            else:
+                under_enter_price = 'underlying_ask_1545'
+        else:   # side[:1] == 'l':
+            if opt_type == 'P':
+                under_enter_price = 'underlying_ask_1545'
+            else:
+                under_enter_price = 'underlying_bid_1545'
+    else:
+        enter_price = 'err'
+        under_enter_price = 'err'
+        exit('Wrong enter time %s' % enter_time)
 
+    df = df.rename(columns={enter_price:'enter',under_enter_price:'under_enter','close':'out_tmp','underlying_close':'under_out'})
+    df = df.loc[((df['quote_date'] < df['expiration']) & (df['enter'] > 0.01)) | (df['quote_date'] == df['expiration'])]
+    df = df[['quote_date','expiration','under_enter','strike','enter','under_out','out_tmp','days_to_exp']]
     df_in = make_delta_column(df.loc[df['days_to_exp'] > 0].copy(),opt_type=opt_type,i=i)
     df_min_delta = df_in.groupby(['expiration'])['delta'].min().to_frame()
     df_in = pd.merge(df_min_delta, df_in, on=['expiration', 'delta']).sort_values(['quote_date', 'expiration'])
