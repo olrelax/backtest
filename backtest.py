@@ -9,8 +9,8 @@ start_date = ''
 before_date = ''
 fn = ''     # filename base for outputs
 comm = 0    # commission per option
-low_price_limit = 0
-high_price_limit = 0
+low_spread_price_limit = 0
+high_opt_price_limit = 0
 condition = 0   # global variable used for map methods
 stock = ''
 mf = 'mf'
@@ -75,7 +75,7 @@ def select_cols():
     body = 'strike_0,under_enter_0,enter_0,under_out_0,out_0,margin_0,profit_0,opt_sum_0,overstrike_0,'
     if count == 2:
         body = body + 'strike_1,under_enter_1,enter_1,under_out_1,out_1,margin_1,profit_1,opt_sum_1,overstrike_1,'
-    cols_str = head + body + 'opt_sum,sum,opt_trade_price,raw_profit,raw_sum,lcond,hcond'
+    cols_str = head + body + 'opt_sum,sum,spread_price,raw_profit,raw_sum,lcond,hcond'
     if stock in ('ltrade','strade'):
         cols_str = cols_str +',stock,under_sum'
     if stock == 'plot':
@@ -124,17 +124,17 @@ def decode_algo(algo_str):
         elif algo_names[i] in ('fp', 'fixed_price','fix_price'):
             algo_names[i] = 'fixed_price'
         else:
-            exit('Unknown algo_name <%s>' % algo_names[i])
+            exit('Unknown algo_name <%s>. Choose one:\nop|otm_prc, ou|otm_usd, hu|hedge_usd,fp|fix[ed]_price' % algo_names[i])
 
 k=0
 def make_delta_column(df_in,opt_type,i):
     global hedge_usd,disc_prc,k
-    if i == 0:
+    if i%2 == 0:
         hedge_usd = 35
         if algo_names[i] == 'otm_prc':
             prc = float(algo_values[i])
             disc_prc = prc
-            k = (100. + prc * (1 if opt_type[0] == 'C' else -1.)) / 100.
+            k = (100. + prc * (1 if opt_type[0] == 'Call' else -1.)) / 100.
             if i == 0:
                 df_in['delta'] = (df_in['under_enter'] * k - df_in['strike']).abs() * 10.0
                 df_in['delta'] = df_in['delta'].astype(int)
@@ -143,17 +143,17 @@ def make_delta_column(df_in,opt_type,i):
             df_in['delta'] = ((df_in['enter'].sub(price)).abs()*100.0).astype(int)
         else:
             return exit('Wrong algo %d <%s>' % (i, algo_names[i]))
-    if i > 0:
+    if i%2 == 1:
         if algo_names[i] == 'hedge_usd':
             usd = int(algo_values[i])
-            hedge_shift = usd * i * (1 if opt_type[0] == 'C' else -1)
+            hedge_shift = usd * i * (1 if opt_type[0] == 'Call' else -1)
             hedge_usd = abs(hedge_shift)
             df_in['delta'] = (df_in['under_enter'] * k + hedge_shift - df_in['strike']).abs() * 10.0
             df_in['delta'] = df_in['delta'].astype(int)
         elif algo_names[i] == 'otm_prc':
             hedge_usd = 0
             prc = float(algo_values[i])
-            k = (100. + prc * (1 if opt_type[0] == 'C' else -1.)) / 100.
+            k = (100. + prc * (1 if opt_type[0] == 'Call' else -1.)) / 100.
             df_in['delta'] = (df_in['under_enter'] * k - df_in['strike']).abs() * 10.0
             df_in['delta'] = df_in['delta'].astype(int)
         else:
@@ -178,12 +178,12 @@ def in2exp(side, opt_type,i):
     elif enter_time == '1545':
         enter_price = 'bid_1545'
         if side[:1] == 's':
-            if opt_type == 'P':
+            if opt_type == 'Put':
                 under_enter_price = 'underlying_bid_1545'
             else:
                 under_enter_price = 'underlying_ask_1545'
         else:   # side[:1] == 'l':
-            if opt_type == 'P':
+            if opt_type == 'Put':
                 under_enter_price = 'underlying_ask_1545'
             else:
                 under_enter_price = 'underlying_bid_1545'
@@ -201,7 +201,7 @@ def in2exp(side, opt_type,i):
     df_in = df_in.drop_duplicates(subset=['quote_date', 'expiration'])
     df_in = df_in[['expiration', 'delta', 'quote_date', 'under_enter', 'strike', 'enter']]
     df_out = df.loc[df['quote_date'] == df['expiration']][['expiration', 'strike', 'under_out','out_tmp']].copy().reset_index(drop=True)
-    sign = 1. if opt_type[0] == 'P' else -1.
+    sign = 1. if opt_type == 'Put' else -1 if opt_type == 'Call' else exit('Wrong opt_type {}'.format(opt_type))
     df_out['overstrike'] = (df_out['strike'] - df_out['under_out']) * sign
     condition = 0
     df_out['k'] = pd.Series(map(greater_than_condition,df_out['overstrike'])).to_frame()     # make out price 0.0 if not executed on expiration
@@ -213,8 +213,8 @@ def in2exp(side, opt_type,i):
     df = numerate(df,i)
     return df
 def backtest(types,sides,algo_str):
-    global count, low_price_limit,high_price_limit,max_trades,trades,condition,dd_raw_count,dd_count
-    count = min(len(sides), len(types))
+    global count, low_spread_price_limit,high_opt_price_limit,max_trades,trades,condition,dd_raw_count,dd_count
+    count = min(len(sides), len(types),len(algo_str.split(',')))
     df = None
     decode_algo(algo_str)
     for i in range(count):
@@ -224,18 +224,18 @@ def backtest(types,sides,algo_str):
     max_trades = len(df)
     df = add_stock_chart(df)
     for i in range(count):
-        df['opt_trade_price'] = df['enter_0'] if i == 0 else df['opt_trade_price'] - df['enter_%d' % i]
+        df['spread_price'] = df['enter_0'] if i == 0 else df['spread_price'] - df['enter_%d' % i]
     df['raw_profit'] = df['profit_0']
     df['raw_sum'] = (df['raw_profit'].cumsum(axis=0)).fillna(method='ffill')
     dd_raw_count = len(df.loc[df['margin_0'] < 0])
     trades = max_trades
     if shrink_by_lower_cond > 0:
-        df_max = df.loc[df['strike_0'].notnull()].sort_values('opt_trade_price')
-        low_price_limit = df_max[-int(max_trades*shrink_by_lower_cond/100):]['opt_trade_price'].min()
+        df_max = df.loc[df['strike_0'].notnull()].sort_values('spread_price')
+        low_spread_price_limit = df_max[-int(max_trades*shrink_by_lower_cond/100):]['spread_price'].min()
 
-    if low_price_limit > 0:
-        condition = low_price_limit
-        df['lcond'] = pd.Series(map(greater_than_condition, df['opt_trade_price'])).to_frame()
+    if low_spread_price_limit > 0:
+        condition = low_spread_price_limit
+        df['lcond'] = pd.Series(map(greater_than_condition, df['spread_price'])).to_frame()
         for i in range(count):
             df['profit_%d' % i] = df['profit_%d' % i] * df['lcond']
         trades = len(df.loc[df['lcond'] > 0])
@@ -243,12 +243,12 @@ def backtest(types,sides,algo_str):
         df['lcond'] = 1
 
     if shrink_by_high_cond > 0:
-        df_max = df.loc[df['strike_0'].notnull()].sort_values('opt_trade_price')
-        high_price_limit = df_max[:int(max_trades*shrink_by_high_cond/100)]['opt_trade_price'].max()
+        df_max = df.loc[df['strike_0'].notnull()].sort_values('spread_price')
+        high_opt_price_limit = df_max[:int(max_trades*shrink_by_high_cond/100)]['spread_price'].max()
 
-    if high_price_limit > 0:
-        condition = high_price_limit
-        df['hcond'] = pd.Series(map(less_than_condition, df['opt_trade_price'])).to_frame()
+    if high_opt_price_limit > 0:
+        condition = high_opt_price_limit
+        df['hcond'] = pd.Series(map(less_than_condition, df['spread_price'])).to_frame()
         for i in range(count):
             df['profit_%d' % i] = df['profit_%d' % i] * df['hcond']
         trades = len(df.loc[(df['hcond'] > 0) & (df['lcond'] > 0)])
@@ -275,12 +275,18 @@ def backtest(types,sides,algo_str):
         df = scale_stock(df)
     cols = select_cols()
     return df[cols]
-
+def read_types(a_types):
+    types = a_types.split(',')
+    cnt = len(types)
+    for i in range(cnt):
+        if types[i] not in ('Put','Call'):
+            exit('Wrong type %s' % types[i])
+    return types
 
 def main_proc():
-    global before_date, start_date, fn,ticker,comm,low_price_limit,high_price_limit,stock,\
+    global before_date, start_date, fn,ticker,comm,low_spread_price_limit,high_opt_price_limit,stock,\
         shrink_by_high_cond,shrink_by_lower_cond,mf,capital,disc_prc,hedge_usd,enter_time
-    types = read_entry('backtest','types').split(',')
+    types = read_types(read_entry('backtest','types'))
     sides = read_entry('backtest','sides').split(',')
     algo_str = read_entry('backtest','sides_algo')
     start_date = read_entry('backtest','start_date')
@@ -288,8 +294,8 @@ def main_proc():
     enter_time = read_entry('backtest','enter_time')
     ticker = read_entry('backtest','ticker')
     comm = flt(read_entry('backtest','comm'))
-    low_price_limit = flt(read_entry('backtest','low_price_limit'))
-    high_price_limit = flt(read_entry('backtest','high_price_limit'))
+    low_spread_price_limit = flt(read_entry('backtest','low_spread_price_limit'))
+    high_opt_price_limit = flt(read_entry('backtest','high_opt_price_limit'))
     stock = read_entry('backtest','stock',check=('plot','ltrade','strade'))
     plot_raw_result = read_entry('backtest','plot_raw_result')
     mf = read_entry('backtest','mf')
@@ -302,7 +308,7 @@ def main_proc():
     save_test(df)
     summa = df['opt_sum'].iloc[-1] if trades > 0 else exit('No trades')
     descr_str = '{} {} {} disc {}, hedge {}'.format(ticker, types, sides, disc_prc,hedge_usd)
-    limit_str = 'h_lim, %.2f, l_lim %.2f' % (high_price_limit,low_price_limit) if high_price_limit > 0 and low_price_limit > 0 else 'l_lim %.2f' % low_price_limit if low_price_limit > 0 else 'h_lim %.2f' % high_price_limit if high_price_limit > 0 else ''
+    limit_str = 'h_lim, %.2f, l_lim %.2f' % (high_opt_price_limit,low_spread_price_limit) if high_opt_price_limit > 0 and low_spread_price_limit > 0 else 'l_lim %.2f' % low_spread_price_limit if low_spread_price_limit > 0 else 'h_lim %.2f' % high_opt_price_limit if high_opt_price_limit > 0 else ''
     cond_str = 'shrink %d, %s' % (shrink_by_lower_cond, limit_str) if shrink_by_lower_cond > 0 else limit_str
     max_dd_val = df.loc[(df['margin_0'] < 0) & (df['lcond'] == 1)]['margin_0'].min() if dd_count > 0 else 0
     max_raw_dd_val = df.loc[df['margin_0'] < 0]['margin_0'].min() if dd_raw_count > 0 else 0
