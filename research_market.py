@@ -1,6 +1,9 @@
-import pandas as pd
-from dateutil.relativedelta import *
+#import pandas as pd
+#from dateutil.relativedelta import *
 import inspect
+
+from pandas import DatetimeIndex
+
 from au import *
 import os
 import matplotlib.pyplot as plt
@@ -140,7 +143,7 @@ def print_df(df):
     columns = df.columns
     s = ''
     for c in range(len(row)):
-        v = row[c]
+        v = row.iloc[c]
         if isinstance(v, datetime):
             add = '%10s ' % columns[c]
         elif isinstance(v, float):
@@ -214,7 +217,7 @@ def scale_stock(df):
     elif 'otm' in df.columns:
         cols = ['otm']
     else:
-        cols=['ma']
+        cols = ['ma']
     dfnn = df[~df.isnull().any(axis=1)]
     opt_min = dfnn[cols].to_numpy().min()
     opt_max = dfnn[cols].to_numpy().max()
@@ -223,13 +226,6 @@ def scale_stock(df):
     df[stock] = df[stock] * (opt_max - opt_min) / (under_max - under_min)
     under_min = df[stock].to_numpy().min()
     df[stock] = df[stock] - under_min + opt_min
-    # otm_min = df['otm'].to_numpy().min()
-    # otm_max = df['otm'].to_numpy().max()
-    # df['otm'] = df['otm'] * (opt_max - opt_min) / (otm_max - otm_min)
-    # otm_min = df['otm'].to_numpy().min()
-    # df['otm'] = df['otm'] - otm_min + opt_min
-
-
     return df
 
 def from_1545_to_eod():
@@ -270,14 +266,14 @@ def make_datafile():
 
 def atm_price(disc,bd_str,ma_per):
     timing = 'open'
-    if ma_per>0:
-        plot = ['underlying','ma']
+    if ma_per > 0:
+        plot_columns = ['underlying','ma']
     else:
-        plot = ['otm','underlying']
+        plot_columns = ['atm','otm','underlying']
     if timing == '1545':
-        openf = 'ask_1545'
+        open_price = 'ask_1545'
     else:
-        openf = 'open'
+        open_price = 'open'
 
     bd = s2d(bd_str)
     if not os.path.exists('../data/QQQ/QQQ_P.csv'):
@@ -304,41 +300,29 @@ def atm_price(disc,bd_str,ma_per):
     df_min = df_atm.groupby(['quote_date','expiration'])['delta_atm'].min().to_frame()
     df_atm = pd.merge(df_atm,df_min,on=['quote_date','expiration','delta_atm']).drop_duplicates(subset=['quote_date'])
     df_atm['enter'] = df_atm['enter'] - (df_atm['underlying'] - df_atm['strike'])
-    df_atm = df_atm[['expiration','enter','underlying']]
+    df_atm = df_atm[['quote_date','expiration','enter','underlying']]
     df_otm = df.loc[df['delta_otm'] >= 0].copy()
     df_otm['delta_otm'] = df_otm['delta_otm'].astype(int)
     df_min = df_otm.groupby(['quote_date','expiration'])['delta_otm'].min().to_frame()
     df_otm = pd.merge(df_otm,df_min,on=['quote_date','expiration','delta_otm']).drop_duplicates(subset=['quote_date'])
     df_otm = df_otm[['expiration','enter']]
     df = pd.merge(df_atm,df_otm,on='expiration').rename(columns={'enter_x':'atm','enter_y':'otm'})
-    cols = ['expiration'] + plot
+    save(df,'otm-%d' % disc)
+    cols = ['expiration'] + plot_columns
     df['ma'] = df['otm'].rolling(ma_per).mean()
-    df = df.loc[df['expiration']>bd][cols]
+    df = df.loc[df['expiration'] > bd][cols]
     df = scale_stock(df)
     df = df.set_index('expiration')
-    df = df[plot]
+    df = df[plot_columns]
     ax = df.plot(figsize=(11, 7))
     freq = 'M' if len(df) > 10 else 'D'
-    xtick = pd.date_range(start=df.index.min(), end=df.index.max(), freq=freq)
+    xtick: DatetimeIndex = pd.date_range(start=df.index.min(), end=df.index.max(), freq=freq)
     ax.set_xticks(xtick, minor=False)  # play with parameter
     ax.grid('on', which='minor')
     ax.grid('on', which='major')
-    plt.savefig('../devel/%s.png' % openf)
+    plt.savefig('../devel/%s.png' % open_price)
     plt.show()
 
-def an15m():
-    df = pd.read_csv('../data/QQQ/US1.QQQ_190101_230303.csv',names=['date','per','open','high','low','close','vol'],
-                     parse_dates=['date'],dtype={'per':object})
-    df['dd'] = df.open - df.close
-    df['weekday'] = pd.Series(map(lambda x: x.isoweekday(), df['date']))
-    bd = s2d('2021-12-31')
-    df = df.loc[df['date']>bd]
-    df = (df.loc[df.per == '154500']).sort_values(['dd'])
-    df = df.loc[(df['weekday']>1) & (df['weekday']<5)]
-    print(df.tail(20))
-"""
-09/22/2022
-"""
 if __name__ == '__main__':
     ticker = read_entry('research','ticker')
     ent_weekday = int(read_entry('research','enter_weekday'))
@@ -350,7 +334,7 @@ if __name__ == '__main__':
     arg_2 = read_entry('research','arg_2')
     arg_3 = read_entry('research','arg_3')
 
-    if procedure in ('1'):
+    if procedure == '1':
         max_move(tick=ticker, enter_weekday=ent_weekday, show_rows=show_r, yr=year, sort=arg_1)
     elif procedure == '2':
         lowest_week_price(tick=ticker,enter_weekday=ent_weekday,show_rows=show_r,sort=arg_1,yr=year)
@@ -360,5 +344,3 @@ if __name__ == '__main__':
         single_opt(opt_date='2020-03-20',strike=177)
     elif procedure == '5':
         from_1545_to_eod()
-    elif procedure == '6':
-        an15m()

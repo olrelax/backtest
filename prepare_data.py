@@ -87,51 +87,6 @@ def intraday(date,bottom=None,top=None):
 def td(d):
     return d.days
 
-'''def get_sftp_cboe(month=None,days_arg=None):
-    days,count,localpath,filename = 0,0,'',''
-    if month is None or days_arg is None:
-        now = datetime.now()
-        yes = add_days(now,-1)
-        month = yes.month
-        days = [yes.day]
-        count = 1
-    elif isinstance(days_arg,int):
-        days = [days_arg]
-        count = 1
-    elif isinstance(days_arg,tuple) or isinstance(days_arg,list):
-        days = days_arg
-        count = len(days)
-    if count > 1:
-        exit("Does not work for count > 1")
-    host, port = "sftp.datashop.livevol.com", 22
-    d = '../data/SPY_2022_CBOE_SRC/'
-    transport = paramiko.Transport((host, port))
-    username, password = "olrelax_gmail_com", "Hiwiehi0fz1$"
-    print('connect...')
-    transport.connect(None, username, password)
-    print('connected')
-    sftp = paramiko.SFTPClient.from_transport(transport)
-    for i in range(count):
-        filename = 'UnderlyingOptionsEODQuotes_2022-%.2d-%.2d.zip' % (month,days[i])
-        remotepath = 'subscriptions/order_000025299/item_000030286/%s' % filename
-        localpath = '/Users/oleg/Library/Mobile Documents/com~apple~CloudDocs/PyProjects/Archive/CBOE_SRC/subscriptions/order_000025299/item_000030286/%s' % filename
-        print('get %s->%s' % (remotepath, localpath))
-        sftp.get(remotepath, localpath)
-        system('ls %s|tail -n 5' % d)
-    if sftp:
-        print('received')
-        sftp.close()
-    if transport:
-        transport.close()
-    with zipfile.ZipFile(localpath, 'r') as zip_ref:
-        zip_ref.extractall(d)
-    print('ls:')
-#    d = '../data/SPY_2022_CBOE_SRC/'
-#    system('ls %s | grep %s' % (d,filename[:-4]))
-    system('ls %s|tail -n 5' % d)
-
-    print('done')
-'''
 def add_weekday(ticker,y=None,option_type='P,C'):
     if y is None:
         y = 2022
