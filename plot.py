@@ -48,8 +48,9 @@ def plot(df,x_axis,txt,fn,opt_count,stock,plot_raw):
         cols = cols + ',sum'
     dfp = df[cols.split(',')]
     dfp = dfp.set_index(x_axis)
+    # save(dfp,'df_plot')
     ax = dfp.plot(figsize=(11, 7), title=txt)
-    if len(dfp) >32:
+    if len(dfp) > 32:
         freq = 'M'
         xtick = pd.date_range(start=dfp.index.min(), end=dfp.index.max(), freq=freq)
         ax.set_xticks(xtick, minor=False)   # play with parameter

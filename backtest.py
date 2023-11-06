@@ -20,6 +20,7 @@ dd_count,dd_raw_count,max_trades,trades = 0, 0, 0, 0
 shrink_by_lower_cond,shrink_by_high_cond = 0,0
 enter_time = ''
 hedge_usd,disc_prc,contract_margin = 0,0,0
+min_opt_prc = 0
 def show(df, stop=True):
     name = get_name(df)[0]
     print('-----------------%s------------' % name)
@@ -89,6 +90,10 @@ def select_cols():
 
 def scale_to_capital(df):
     global contract_margin
+    if count < 2:
+        contract_margin = 3000
+    else:
+        contract_margin = hedge_usd * 100
     if stock in ('strade', 'ltrade') and capital not in ('','per opt'):
         return exit('Unable scale to capital when trade stock')
     if capital in ('','per opt'):
@@ -96,10 +101,6 @@ def scale_to_capital(df):
     elif capital in ('%','prc'):
         cap_factor = 100/hedge_usd
     elif isfloat(capital) and float(capital) > 0:
-        if count < 2:
-            contract_margin = 3000
-        else:
-            contract_margin = hedge_usd * 100
         contracts_qty = float(capital)/contract_margin
         cap_factor = 100 * contracts_qty
     else:
@@ -248,14 +249,16 @@ def backtest(types,sides,algo_str):
         df_side = df_side.sort_values(['quote_date', 'expiration'])
         df = df_side if i == 0 else pd.merge(df, df_side, on=['quote_date', 'expiration'], how='inner')
     max_trades = len(df)
-    df = add_stock_chart(df)
+    if count > 1:
+        df = df.loc[df['enter_0'] > df['enter_1']]
+    # df = add_stock_chart(df)
     for i in range(count):
         df['spread_price'] = df['enter_0'] if i == 0 else df['spread_price'] - df['enter_%d' % i]
     df['raw_profit'] = df['profit_0']
     df['raw_sum'] = (df['raw_profit'].cumsum(axis=0)).ffill()
-    if count >1:
-        df = df.loc[df['enter_0'] > df['enter_1']]
     dd_raw_count = len(df.loc[df['margin_0'] < 0])
+    df = add_stock_chart(df)
+
     trades = max_trades
     if shrink_by_lower_cond > 0:
         df_max = df.loc[df['strike_0'].notnull()].sort_values('spread_price')
@@ -282,11 +285,19 @@ def backtest(types,sides,algo_str):
         trades = len(df.loc[(df['hcond'] > 0) & (df['lcond'] > 0)])
     else:
         df['hcond'] = 1
+    # drop trades with opt_prc less than min_opt_prc
+    if min_opt_prc > 0:
+        df['opt_prc'] = (df['under_enter_0'] - df['strike_0'])/df['under_enter_0']
+        df['opt_prc_cond'] = (df['opt_prc'] > min_opt_prc/100.) | (df['strike_0'].isnull())
+        df = df.loc[df['opt_prc_cond']].copy()
+        # save(df)
+
+
     dd_count = len(df.loc[(df['margin_0'] < 0) & (df['lcond'] == 1)])
 
     for i in range(count):
         df['opt_sum_%d' % i] = df['profit_%d' % i].cumsum(axis=0)
-        df['opt_sum_%d' % i] = df['opt_sum_%d' % i].ffill()
+        df['opt_sum_%d' % i] = df['opt_sum_%d' % i].ffill().bfill()
     for i in range(count):
         df['opt_sum'] = df['opt_sum_%d' % i] if i == 0 else df['opt_sum'] + df['opt_sum_%d' % i]
     if stock in ('ltrade','strade'):
@@ -294,7 +305,7 @@ def backtest(types,sides,algo_str):
             df['under_profit'] = df['under_out_0'] - df['under_enter_0']
         else:
             df['under_profit'] = df['under_enter_0'] - df['under_out_0']
-        df['under_sum'] = (df['under_profit'].cumsum(axis=0)).fillna(method='ffill')
+        df['under_sum'] = (df['under_profit'].cumsum(axis=0)).ffill().bfill()
         df['sum'] = df['opt_sum'] + df['under_sum']
     else:
         df['sum'] = df['opt_sum']
@@ -313,7 +324,7 @@ def read_types(a_types):
 
 def main_proc():
     global monday_only, before_date, start_date, fn,ticker,comm,low_spread_price_limit,high_opt_price_limit,stock,\
-        shrink_by_high_cond,shrink_by_lower_cond,mf,capital,disc_prc,hedge_usd,enter_time
+        shrink_by_high_cond,shrink_by_lower_cond,mf,capital,disc_prc,hedge_usd,enter_time,min_opt_prc
     types = read_types(read_entry('backtest','types'))
     sides = read_entry('backtest','sides').split(',')
     algo_str = read_entry('backtest','sides_algo')
@@ -333,6 +344,7 @@ def main_proc():
     capital = read_entry('backtest','capital')
     shrink_by_high_cond = flt(read_entry('backtest','shrink_by_high_cond'))
     shrink_by_lower_cond = flt(read_entry('backtest','shrink_by_lower_cond'))
+    min_opt_prc = flt(read_entry('backtest','min_opt_prc'))
 
     df = backtest(types,sides,algo_str)
 
@@ -342,9 +354,9 @@ def main_proc():
     limit_str = 'h_lim, %.2f, l_lim %.2f' % (high_opt_price_limit,low_spread_price_limit) if high_opt_price_limit > 0 and low_spread_price_limit > 0 else 'l_lim %.2f' % low_spread_price_limit if low_spread_price_limit > 0 else 'h_lim %.2f' % high_opt_price_limit if high_opt_price_limit > 0 else ''
     cond_str = 'shrink %d, %s' % (shrink_by_lower_cond, limit_str) if shrink_by_lower_cond > 0 else limit_str
     max_dd_val = df.loc[(df['margin_0'] < 0) & (df['lcond'] == 1)]['margin_0'].min() if dd_count > 0 else 0
-    max_dd_prc = max_dd_val * 10000 / contract_margin
+    max_dd_prc = max_dd_val * 10000 / contract_margin if contract_margin > 0 else 0
     max_raw_dd_val = df.loc[df['margin_0'] < 0]['margin_0'].min() if dd_raw_count > 0 else 0
-    max_raw_dd_prc = max_raw_dd_val * 10000 / contract_margin
+    max_raw_dd_prc = max_raw_dd_val * 10000 / contract_margin if contract_margin > 0 else 0
     dd_str = 'max dd %.0f%%/%.0f%%' % (-max_dd_prc,-max_raw_dd_prc) if dd_count > 0 or dd_raw_count > 0 else ''
     sum_fmt = 'profit %.2f' % summa if capital in ('','per opt') else 'profit %.2f%%' % summa if capital in ('%','prc') else 'profit/capital $%.2f/$%.2f' % (summa,float(capital))
     per_trade = summa/trades

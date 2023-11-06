@@ -288,10 +288,10 @@ def atm_price(disc,bd_str,ma_per):
         df_under['Date'] = pd.to_datetime(df_under['Date'])
         df = pd.merge(df,df_under,left_on='quote_date',right_on='Date',how='outer')
         df = df.rename(columns={'Open':'underlying','open':'enter'})
-        df = df.drop(columns={'underlying_bid_1545','ask_1545','Date','High','Low','Close','Adj Close','Volume'})
+        df = df.drop(columns=['underlying_bid_1545','ask_1545','Date','High','Low','Close','Adj Close','Volume'])
     else:
         df = df.rename(columns={'underlying_bid_1545':'underlying','ask_1545':'enter'})
-        df = df.drop(columns={'open'})
+        df = df.drop(columns=['open'])
     df['delta_atm'] = (df['underlying'] - df['strike']) * 100
     df['delta_otm'] = (df['underlying'] * (100 - disc)/100 - df['strike']) * 100
 
@@ -335,7 +335,7 @@ if __name__ == '__main__':
     arg_3 = read_entry('research','arg_3')
 
     if procedure == '1':
-        max_move(tick=ticker, enter_weekday=ent_weekday, show_rows=show_r, yr=year, sort=arg_1)
+        max_move(tick=ticker, enter_weekday=ent_weekday, show_rows=show_r, yr=year, sort='prc_oc' if arg_1 == '' else arg_1)
     elif procedure == '2':
         lowest_week_price(tick=ticker,enter_weekday=ent_weekday,show_rows=show_r,sort=arg_1,yr=year)
     elif procedure == '3':
