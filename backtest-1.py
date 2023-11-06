@@ -10,7 +10,6 @@ before_date = ''
 fn = ''     # filename base for outputs
 comm = 0    # commission per option
 low_spread_price_limit = 0
-high_opt_price_limit = 0
 condition = 0   # global variable used for map methods
 stock = ''
 mf = ''
@@ -280,8 +279,8 @@ def read_types(a_types):
     return types
 
 def main_proc():
-    global monday_only, before_date, start_date, fn,ticker,comm,low_spread_price_limit,high_opt_price_limit,stock,\
-        shrink_by_high_cond,shrink_by_lower_cond,mf,capital,disc_prc,hedge_usd,enter_time,min_opt_prc
+    global monday_only, before_date, start_date, fn,ticker,comm,stock,\
+        mf,capital,disc_prc,hedge_usd,enter_time,min_opt_prc
     types = read_types(read_entry('backtest','types'))
     sides = read_entry('backtest','sides').split(',')
     algo_str = read_entry('backtest','sides_algo')
@@ -290,16 +289,12 @@ def main_proc():
     enter_time = read_entry('backtest','enter_time')
     ticker = read_entry('backtest','ticker')
     comm = flt(read_entry('backtest','comm'))
-    low_spread_price_limit = flt(read_entry('backtest','low_spread_price_limit'))
-    high_opt_price_limit = flt(read_entry('backtest','high_opt_price_limit'))
     stock = read_entry('backtest','stock',check=('plot','ltrade','strade'))
     mf = read_entry('backtest','mf')
     if mf == 'm':
         mf = 'mf'
         monday_only = True
     capital = read_entry('backtest','capital')
-    shrink_by_high_cond = flt(read_entry('backtest','shrink_by_high_cond'))
-    shrink_by_lower_cond = flt(read_entry('backtest','shrink_by_lower_cond'))
     min_opt_prc = flt(read_entry('backtest','min_opt_prc'))
 
     df = backtest(types,sides,algo_str)
@@ -308,15 +303,13 @@ def main_proc():
     trades = len(df)
     summa = df['opt_sum'].iloc[-1] if trades > 0 else exit('No trades')
     descr_str = '{} {} {} disc {}, hedge {}'.format(ticker, types, sides, disc_prc,hedge_usd)
-    limit_str = 'h_lim, %.2f, l_lim %.2f' % (high_opt_price_limit,low_spread_price_limit) if high_opt_price_limit > 0 and low_spread_price_limit > 0 else 'l_lim %.2f' % low_spread_price_limit if low_spread_price_limit > 0 else 'h_lim %.2f' % high_opt_price_limit if high_opt_price_limit > 0 else ''
-    cond_str = 'shrink %d, %s' % (shrink_by_lower_cond, limit_str) if shrink_by_lower_cond > 0 else limit_str
     max_dd_val = df.loc[(df['margin_0'] < 0) & (df['lcond'] == 1)]['margin_0'].min() if dd_count > 0 else 0
     max_dd_prc = max_dd_val * 10000 / contract_margin if contract_margin > 0 else 0
     dd_str = 'max dd %.0f%%' % -max_dd_prc if dd_count > 0 else ''
     sum_fmt = 'profit %.2f' % summa if capital in ('','per opt') else 'profit %.2f%%' % summa if capital in ('%','prc') else 'profit/capital $%.2f/$%.2f' % (summa,float(capital))
     per_trade = summa/trades
     res = '%s, per trade %.2f, trades %d, %s' % (sum_fmt, per_trade,trades,dd_str)
-    txt = '%s, %s\n%s' % (descr_str, cond_str,res)
+    txt = '%s\n%s' % (descr_str,res)
     if mf == 'fm':
         txt = 'Fri - Mon\n%s' % txt
     plot(df,x_axis='quote_date',txt=txt,opt_count=count,fn=fn,stock=stock,plot_raw=None)
